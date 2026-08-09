@@ -80,12 +80,25 @@ typings/
 # dotenv environment variables file
 .env
 .env.test
+.env.local
+web/.env.local
+
+# Firebase
+.firebase/
+firebase-debug.log
+firebase-debug.*.log
+functions/lib/
+shared/dist/
+web/dist/
 
 # parcel-bundler cache (https://parceljs.org/)
 .cache
 
 # Next.js build output
 .next
+
+# Astro build output
+.astro
 
 # Nuxt.js build / generate output
 .nuxt

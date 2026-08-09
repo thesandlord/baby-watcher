@@ -1,0 +1,152 @@
+import { useEffect, useState } from 'react';
+import {
+  onAuthStateChanged,
+  signInWithEmailAndPassword,
+  createUserWithEmailAndPassword,
+  signInWithPopup,
+  signOut,
+  type User,
+} from 'firebase/auth';
+import type { DaySchedule } from '@baby-watcher/shared';
+import { auth, googleProvider } from './lib/firebase';
+import {
+  getProfile,
+  loadOrGenerateSchedule,
+  regenerateSchedule,
+} from './lib/firestore-api';
+import { todayIsoDate, type UserProfile } from './lib/utils';
+import { ThemeProvider } from './lib/theme';
+import { LoginScreen } from './components/LoginScreen';
+import { OnboardingScreen } from './components/OnboardingScreen';
+import { ScheduleView } from './components/ScheduleView';
+import { FloatingCameraButton } from './components/FloatingCameraButton';
+
+function AppContent() {
+  const [user, setUser] = useState<User | null>(null);
+  const [profile, setProfile] = useState<UserProfile | null>(null);
+  const [selectedDate, setSelectedDate] = useState(todayIsoDate());
+  const [schedule, setSchedule] = useState<DaySchedule | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    return onAuthStateChanged(auth, async (nextUser) => {
+      setUser(nextUser);
+      if (!nextUser) {
+        setProfile(null);
+        setSchedule(null);
+        setLoading(false);
+        return;
+      }
+
+      try {
+        setProfile(await getProfile());
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Failed to load profile.');
+      } finally {
+        setLoading(false);
+      }
+    });
+  }, []);
+
+  useEffect(() => {
+    if (!user || !profile?.household) {
+      return;
+    }
+
+    void loadSchedule(selectedDate);
+  }, [user, profile?.household?.id, selectedDate]);
+
+  async function loadSchedule(date: string) {
+    if (!profile?.household) {
+      return;
+    }
+
+    setBusy(true);
+    setError(null);
+    try {
+      setSchedule(await loadOrGenerateSchedule(profile.household.id, date));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to load schedule.');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function handleRegenerate() {
+    if (!profile?.household) {
+      return;
+    }
+
+    setBusy(true);
+    setError(null);
+    try {
+      setSchedule(await regenerateSchedule(profile.household.id, selectedDate));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to regenerate schedule.');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function refreshProfile() {
+    const nextProfile = await getProfile();
+    setProfile(nextProfile);
+    if (nextProfile?.household) {
+      setSchedule(await loadOrGenerateSchedule(nextProfile.household.id, selectedDate));
+    }
+  }
+
+  if (loading) {
+    return (
+      <div className="app-shell">
+        <div className="card loading-card">Loading...</div>
+      </div>
+    );
+  }
+
+  if (!user) {
+    return (
+      <LoginScreen
+        onGoogleSignIn={() => signInWithPopup(auth, googleProvider)}
+        onEmailSignIn={(email, password) => signInWithEmailAndPassword(auth, email, password)}
+        onEmailSignUp={(email, password) => createUserWithEmailAndPassword(auth, email, password)}
+      />
+    );
+  }
+
+  if (!profile?.household) {
+    return <OnboardingScreen onComplete={refreshProfile} />;
+  }
+
+  return (
+    <div className="app-shell">
+      <ScheduleView
+        profile={profile}
+        schedule={schedule}
+        selectedDate={selectedDate}
+        busy={busy}
+        error={error}
+        onDateChange={setSelectedDate}
+        onRegenerate={() => void handleRegenerate()}
+        onSignOut={() => void signOut(auth)}
+      />
+
+      <FloatingCameraButton
+        profile={profile}
+        selectedDate={selectedDate}
+        onUploaded={refreshProfile}
+        onError={setError}
+      />
+    </div>
+  );
+}
+
+export default function App() {
+  return (
+    <ThemeProvider>
+      <AppContent />
+    </ThemeProvider>
+  );
+}
