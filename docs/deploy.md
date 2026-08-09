@@ -1,8 +1,23 @@
-# Production deployment
+# Deployment
+
+## Production
 
 Production deploys run automatically via GitHub Actions when changes merge to `main`.
 
 Workflow: [`.github/workflows/deploy.yml`](../.github/workflows/deploy.yml)
+
+## Pull request previews
+
+Every PR gets a live Firebase Hosting preview channel deployed automatically.
+
+Workflow: [`.github/workflows/preview.yml`](../.github/workflows/preview.yml)
+
+- Runs `npm test` + `npm run build`
+- Deploys to channel `pr-{number}` (expires after 7 days)
+- Posts/updates a comment on the PR with the preview URL
+- Deletes the preview channel when the PR is closed
+
+Previews use the same Firebase project and secrets as production (same auth/Firestore backend).
 
 ## One-time Firebase setup
 

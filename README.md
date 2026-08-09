@@ -75,7 +75,8 @@ To use real OpenRouter extraction locally, set `VITE_MOCK_CALENDAR_EXTRACTION=fa
 
 ### Automatic (recommended)
 
-Merging to `main` triggers the GitHub Actions production deploy.
+- **Pull requests** — CI builds and deploys a live Firebase Hosting preview; the URL is posted as a PR comment.
+- **`main` merges** — production deploy to Firebase Hosting + Firestore rules.
 
 See [docs/deploy.md](docs/deploy.md) for the full list of GitHub secrets to configure.
 
