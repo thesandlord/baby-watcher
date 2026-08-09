@@ -73,9 +73,17 @@ To use real OpenRouter extraction locally, set `VITE_MOCK_CALENDAR_EXTRACTION=fa
 
 ## Deploy
 
+### Automatic (recommended)
+
+Merging to `main` triggers the GitHub Actions production deploy.
+
+See [docs/deploy.md](docs/deploy.md) for the full list of GitHub secrets to configure.
+
+### Manual
+
 ```bash
 npm run build
-firebase deploy --only firestore,hosting
+firebase deploy --only firestore,hosting --project YOUR_PROJECT_ID
 ```
 
 ## How scheduling works
