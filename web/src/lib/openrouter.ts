@@ -36,6 +36,10 @@ export async function extractCalendarFromImage(
   mimeType: string,
   hintedDate?: string
 ): Promise<CalendarExtractionResult> {
+  if (import.meta.env.VITE_MOCK_CALENDAR_EXTRACTION === 'true') {
+    return mockCalendarExtraction(hintedDate);
+  }
+
   const apiKey = import.meta.env.VITE_OPENROUTER_API_KEY;
   if (!apiKey) {
     throw new Error('VITE_OPENROUTER_API_KEY is not configured');
@@ -89,6 +93,23 @@ export async function extractCalendarFromImage(
   }
 
   return parseExtractionResult(content);
+}
+
+function mockCalendarExtraction(hintedDate?: string): CalendarExtractionResult {
+  const today = new Date();
+  const date =
+    hintedDate ??
+    `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+
+  return {
+    date,
+    busySlots: [
+      { start: '09:00', end: '11:00', title: 'Team meetings' },
+      { start: '13:00', end: '14:30', title: 'Focus block' },
+    ],
+    needsDateConfirmation: false,
+    confidence: 'high',
+  };
 }
 
 function parseExtractionResult(raw: string): CalendarExtractionResult {

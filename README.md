@@ -43,11 +43,23 @@ npm test
 npm run dev:web
 ```
 
-For emulator-backed development, set `VITE_USE_FIREBASE_EMULATORS=true` and run:
+## Local dev with Firebase emulators
+
+Run Auth + Firestore emulators alongside the Astro dev server with one command:
 
 ```bash
-npm run dev:emulators
+npm run dev:local
 ```
+
+This script:
+- Copies `web/.env.emulator.example` to `web/.env.local` if missing
+- Starts Firestore (8080) and Auth (9099) emulators with the demo project `demo-baby-watcher`
+- Starts Astro on http://localhost:4323
+- Enables mock calendar extraction so you can test uploads without an OpenRouter key
+
+Emulator UI: http://localhost:4000
+
+To use real OpenRouter extraction locally, set `VITE_MOCK_CALENDAR_EXTRACTION=false` and add `VITE_OPENROUTER_API_KEY` in `web/.env.local`.
 
 ## Deploy
 

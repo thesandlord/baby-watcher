@@ -6,6 +6,8 @@ import {
 } from '../lib/firestore-api';
 import { fileToBase64, type UserProfile } from '../lib/utils';
 
+const mockMode = import.meta.env.VITE_MOCK_CALENDAR_EXTRACTION === 'true';
+
 interface FloatingCameraButtonProps {
   profile: UserProfile;
   selectedDate: string;
@@ -35,6 +37,21 @@ export function FloatingCameraButton({
     setManualDate(selectedDate);
   }
 
+  function openUploadModal() {
+    setOpen(true);
+    setManualDate(selectedDate);
+    setNeedsDateConfirmation(false);
+  }
+
+  function handleCameraClick() {
+    if (mockMode) {
+      openUploadModal();
+      return;
+    }
+
+    inputRef.current?.click();
+  }
+
   function handleFileChange(event: React.ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
     if (!file) {
@@ -43,14 +60,16 @@ export function FloatingCameraButton({
 
     setSelectedFile(file);
     setPreviewUrl(URL.createObjectURL(file));
-    setOpen(true);
-    setManualDate(selectedDate);
-    setNeedsDateConfirmation(false);
+    openUploadModal();
     event.target.value = '';
   }
 
-  async function submitUpload(dateOverride?: string) {
-    if (!selectedFile || !profile.household) {
+  async function processUpload(dateOverride?: string) {
+    if (!profile.household) {
+      return;
+    }
+
+    if (!mockMode && !selectedFile) {
       return;
     }
 
@@ -58,10 +77,12 @@ export function FloatingCameraButton({
     onError(null);
 
     try {
-      const imageBase64 = await fileToBase64(selectedFile);
+      const imageBase64 = selectedFile
+        ? await fileToBase64(selectedFile)
+        : 'mock-calendar-image';
       const extraction = await extractCalendarFromImage(
         imageBase64,
-        selectedFile.type || 'image/jpeg',
+        selectedFile?.type || 'image/jpeg',
         dateOverride
       );
 
@@ -99,7 +120,7 @@ export function FloatingCameraButton({
         type="button"
         className="floating-camera"
         aria-label="Upload calendar photo"
-        onClick={() => inputRef.current?.click()}
+        onClick={handleCameraClick}
       >
         📷
       </button>
@@ -119,6 +140,7 @@ export function FloatingCameraButton({
             className="modal-sheet"
             role="dialog"
             aria-modal="true"
+            aria-label="Upload calendar screenshot"
             onClick={(event) => event.stopPropagation()}
           >
             <h2 className="hero-title" style={{ fontSize: '1.25rem' }}>
@@ -127,6 +149,12 @@ export function FloatingCameraButton({
             <p className="hero-subtitle">
               We&apos;ll read your busy times and regenerate the baby-watching schedule.
             </p>
+
+            {mockMode && !previewUrl ? (
+              <div className="success-banner">
+                Local mock mode: sample busy slots will be used for this upload.
+              </div>
+            ) : null}
 
             {previewUrl ? (
               <img src={previewUrl} alt="Calendar preview" className="preview-image" />
@@ -147,7 +175,7 @@ export function FloatingCameraButton({
                   type="button"
                   className="primary-button"
                   disabled={busy}
-                  onClick={() => void submitUpload(manualDate)}
+                  onClick={() => void processUpload(manualDate)}
                 >
                   {busy ? 'Uploading...' : 'Confirm day and upload'}
                 </button>
@@ -158,9 +186,13 @@ export function FloatingCameraButton({
                   type="button"
                   className="primary-button"
                   disabled={busy}
-                  onClick={() => void submitUpload(selectedDate)}
+                  onClick={() => void processUpload(selectedDate)}
                 >
-                  {busy ? 'Uploading...' : 'Upload for selected day'}
+                  {busy
+                    ? 'Uploading...'
+                    : mockMode
+                      ? 'Use sample calendar'
+                      : 'Upload for selected day'}
                 </button>
                 <button type="button" className="ghost-button" onClick={resetModal}>
                   Cancel

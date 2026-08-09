@@ -9,7 +9,12 @@
     "test": "npm run test --workspace=shared",
     "build": "npm run build --workspace=shared && npm run build --workspace=web",
     "dev:web": "npm run dev --workspace=web",
-    "dev:emulators": "firebase emulators:start --only firestore,auth,hosting"
+    "dev:emulators": "firebase emulators:start --only firestore,auth --project demo-baby-watcher",
+    "dev:local": "bash scripts/prepare-local-env.sh && concurrently -k -n emulators,web -c blue,green \"npm run dev:emulators\" \"npm run dev --workspace=web\""
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.2",
+    "firebase-tools": "^13.30.0"
   },
   "engines": {
     "node": ">=20"

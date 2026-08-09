@@ -10,6 +10,7 @@ interface ImportMetaEnv {
   readonly VITE_OPENROUTER_API_KEY: string;
   readonly VITE_OPENROUTER_VISION_MODEL?: string;
   readonly VITE_USE_FIREBASE_EMULATORS?: string;
+  readonly VITE_MOCK_CALENDAR_EXTRACTION?: string;
 }
 
 interface ImportMeta {
