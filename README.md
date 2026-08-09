@@ -57,7 +57,17 @@ This script:
 - Starts Astro on http://localhost:4323
 - Enables mock calendar extraction so you can test uploads without an OpenRouter key
 
+Seed a 3-member demo household (Alice, Bob, Carol) with availability + schedule:
+
+```bash
+npm run seed:demo
+```
+
+Login with `alice@example.com` / `password123`.
+
 Emulator UI: http://localhost:4000
+
+See [docs/local-dev.md](docs/local-dev.md) for emulator setup details (including Java requirement).
 
 To use real OpenRouter extraction locally, set `VITE_MOCK_CALENDAR_EXTRACTION=false` and add `VITE_OPENROUTER_API_KEY` in `web/.env.local`.
 

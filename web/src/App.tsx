@@ -15,12 +15,13 @@ import {
   regenerateSchedule,
 } from './lib/firestore-api';
 import { todayIsoDate, type UserProfile } from './lib/utils';
+import { ThemeProvider } from './lib/theme';
 import { LoginScreen } from './components/LoginScreen';
 import { OnboardingScreen } from './components/OnboardingScreen';
 import { ScheduleView } from './components/ScheduleView';
 import { FloatingCameraButton } from './components/FloatingCameraButton';
 
-export default function App() {
+function AppContent() {
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [selectedDate, setSelectedDate] = useState(todayIsoDate());
@@ -100,7 +101,7 @@ export default function App() {
   if (loading) {
     return (
       <div className="app-shell">
-        <div className="card">Loading...</div>
+        <div className="card loading-card">Loading...</div>
       </div>
     );
   }
@@ -139,5 +140,13 @@ export default function App() {
         onError={setError}
       />
     </div>
+  );
+}
+
+export default function App() {
+  return (
+    <ThemeProvider>
+      <AppContent />
+    </ThemeProvider>
   );
 }

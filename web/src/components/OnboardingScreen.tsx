@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { createHousehold, joinHousehold } from '../lib/firestore-api';
+import { ThemeToggle } from './ThemeToggle';
 
 interface OnboardingScreenProps {
   onComplete: () => Promise<void>;
@@ -13,7 +14,7 @@ export function OnboardingScreen({ onComplete }: OnboardingScreenProps) {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
-  async function handleCreate(event: React.FormEvent) {
+  async function handleCreate(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setBusy(true);
     setError(null);
@@ -28,7 +29,7 @@ export function OnboardingScreen({ onComplete }: OnboardingScreenProps) {
     }
   }
 
-  async function handleJoin(event: React.FormEvent) {
+  async function handleJoin(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setBusy(true);
     setError(null);
@@ -44,6 +45,13 @@ export function OnboardingScreen({ onComplete }: OnboardingScreenProps) {
 
   return (
     <div className="app-shell">
+      <div className="top-bar">
+        <span className="brand-mark" aria-hidden="true">
+          👶
+        </span>
+        <ThemeToggle compact />
+      </div>
+
       <div className="card stack">
         <div>
           <h1 className="hero-title">Set up your household</h1>
@@ -61,20 +69,20 @@ export function OnboardingScreen({ onComplete }: OnboardingScreenProps) {
 
         {error ? <div className="error-banner">{error}</div> : null}
 
-        <div className="stack">
+        <div className="mode-switch">
           <button
             type="button"
-            className={mode === 'create' ? 'primary-button' : 'secondary-button'}
+            className={mode === 'create' ? 'active' : undefined}
             onClick={() => setMode('create')}
           >
-            Create household
+            Create
           </button>
           <button
             type="button"
-            className={mode === 'join' ? 'primary-button' : 'secondary-button'}
+            className={mode === 'join' ? 'active' : undefined}
             onClick={() => setMode('join')}
           >
-            Join with invite code
+            Join
           </button>
         </div>
 

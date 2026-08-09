@@ -151,7 +151,7 @@ export function FloatingCameraButton({
             </p>
 
             {mockMode && !previewUrl ? (
-              <div className="success-banner">
+              <div className="info-banner">
                 Local mock mode: sample busy slots will be used for this upload.
               </div>
             ) : null}

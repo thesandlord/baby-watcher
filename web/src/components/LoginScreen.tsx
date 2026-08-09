@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { ThemeToggle } from './ThemeToggle';
 
 interface LoginScreenProps {
   onGoogleSignIn: () => Promise<unknown>;
@@ -17,7 +18,7 @@ export function LoginScreen({
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
-  async function handleSubmit(event: React.FormEvent) {
+  async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setBusy(true);
     setError(null);
@@ -35,8 +36,15 @@ export function LoginScreen({
   }
 
   return (
-    <div className="app-shell">
-      <div className="card stack">
+    <div className="auth-shell app-shell">
+      <div className="top-bar">
+        <span className="brand-mark" aria-hidden="true">
+          👶
+        </span>
+        <ThemeToggle compact />
+      </div>
+
+      <div className="card auth-card stack">
         <div>
           <h1 className="hero-title">Baby Watcher</h1>
           <p className="hero-subtitle">
@@ -53,13 +61,17 @@ export function LoginScreen({
           onClick={() => {
             setBusy(true);
             setError(null);
-            void onGoogleSignIn().catch((err: unknown) => {
-              setError(err instanceof Error ? err.message : 'Google sign-in failed.');
-            }).finally(() => setBusy(false));
+            void onGoogleSignIn()
+              .catch((err: unknown) => {
+                setError(err instanceof Error ? err.message : 'Google sign-in failed.');
+              })
+              .finally(() => setBusy(false));
           }}
         >
           Continue with Google
         </button>
+
+        <div className="divider">or use email</div>
 
         <form className="stack" onSubmit={(event) => void handleSubmit(event)}>
           <label>
