@@ -331,6 +331,21 @@ button {
   letter-spacing: 0.18em;
 }
 
+.copy-button {
+  flex-shrink: 0;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 0.55rem 0.95rem;
+  background: var(--accent-soft);
+  color: var(--accent-strong);
+  font-weight: 700;
+  font-size: 0.85rem;
+}
+
+.copy-button:hover {
+  transform: translateY(-1px);
+}
+
 .schedule-list {
   display: grid;
   gap: 0.65rem;

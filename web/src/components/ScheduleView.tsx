@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import type { DaySchedule } from '@baby-watcher/shared';
 import { memberColor, memberInitials } from '../lib/members';
 import { formatDisplayDate, formatSlotTime, type UserProfile } from '../lib/utils';
@@ -25,6 +26,17 @@ export function ScheduleView({
   onSignOut,
 }: ScheduleViewProps) {
   const memberIds = profile.household?.members.map((member) => member.userId) ?? [];
+  const [copied, setCopied] = useState(false);
+
+  async function copyInviteCode(code: string) {
+    try {
+      await navigator.clipboard.writeText(code);
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 2000);
+    } catch {
+      setCopied(false);
+    }
+  }
 
   return (
     <>
@@ -76,6 +88,13 @@ export function ScheduleView({
               <span className="field-label">Invite code</span>
               <div className="invite-code">{profile.household.inviteCode}</div>
             </div>
+            <button
+              type="button"
+              className="copy-button"
+              onClick={() => void copyInviteCode(profile.household!.inviteCode!)}
+            >
+              {copied ? 'Copied!' : 'Copy'}
+            </button>
           </div>
         ) : null}
 
