@@ -1,0 +1,44 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function isSelf(userId) {
+      return signedIn() && request.auth.uid == userId;
+    }
+
+    function userHousehold() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.householdId;
+    }
+
+    function inHousehold(householdId) {
+      return signedIn() && userHousehold() == householdId;
+    }
+
+    match /users/{userId} {
+      allow read: if signedIn() && (
+        isSelf(userId) ||
+        resource.data.householdId == userHousehold()
+      );
+      allow create, update: if isSelf(userId);
+    }
+
+    match /households/{householdId} {
+      allow read: if inHousehold(householdId);
+      allow create: if signedIn();
+      allow update: if inHousehold(householdId);
+
+      match /availability/{docId} {
+        allow read: if inHousehold(householdId);
+        allow write: if false;
+      }
+
+      match /schedules/{date} {
+        allow read: if inHousehold(householdId);
+        allow write: if false;
+      }
+    }
+  }
+}

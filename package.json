@@ -1,0 +1,18 @@
+{
+  "name": "baby-watcher",
+  "private": true,
+  "workspaces": [
+    "shared",
+    "functions",
+    "web"
+  ],
+  "scripts": {
+    "test": "npm run test --workspace=shared",
+    "build": "npm run build --workspace=shared && npm run build --workspace=functions && npm run build --workspace=web",
+    "dev:web": "npm run dev --workspace=web",
+    "dev:functions": "npm run build --workspace=functions && firebase emulators:start --only functions,firestore,auth,storage"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
