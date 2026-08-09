@@ -1,3 +1,11 @@
+---
+interface Props {
+  title: string;
+}
+
+const { title } = Astro.props;
+---
+
 <!doctype html>
 <html lang="en">
   <head>
@@ -8,10 +16,13 @@
     />
     <meta name="theme-color" content="#6366f1" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
-    <title>Baby Watcher</title>
+    <title>{title}</title>
   </head>
   <body>
-    <div id="root"></div>
-    <script type="module" src="/src/main.tsx"></script>
+    <slot />
   </body>
 </html>
+
+<style is:global>
+  @import '../index.css';
+</style>

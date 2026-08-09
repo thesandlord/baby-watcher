@@ -97,6 +97,9 @@ web/dist/
 # Next.js build output
 .next
 
+# Astro build output
+.astro
+
 # Nuxt.js build / generate output
 .nuxt
 dist

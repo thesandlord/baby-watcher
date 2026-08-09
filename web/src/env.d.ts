@@ -1,4 +1,4 @@
-/// <reference types="vite/client" />
+/// <reference types="astro/client" />
 
 interface ImportMetaEnv {
   readonly VITE_FIREBASE_API_KEY: string;

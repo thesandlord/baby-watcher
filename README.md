@@ -17,7 +17,7 @@ Everything runs client-side: Firebase Auth + Firestore for data, OpenRouter for 
 ## Monorepo layout
 
 - `shared/` — schedule types and deterministic generator
-- `web/` — Vite + React mobile web app with direct Firestore access
+- `web/` — Astro app with React islands and direct Firestore access
 
 ## Setup
 
