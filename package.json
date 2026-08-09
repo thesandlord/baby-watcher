@@ -7,6 +7,9 @@
   ],
   "scripts": {
     "test": "npm run test --workspace=shared",
+    "pretest:e2e": "npm run build --workspace=shared",
+    "test:e2e": "firebase emulators:exec --only firestore,auth --project demo-baby-watcher \"playwright test\"",
+    "test:e2e:report": "playwright show-report",
     "build": "npm run build --workspace=shared && npm run build --workspace=web",
     "dev:web": "npm run dev --workspace=web",
     "dev:emulators": "firebase emulators:start --only firestore,auth --project demo-baby-watcher",
@@ -14,6 +17,7 @@
     "seed:demo": "FIREBASE_AUTH_EMULATOR_HOST=127.0.0.1:9099 FIRESTORE_EMULATOR_HOST=127.0.0.1:8080 node scripts/seed-emulator-demo.mjs"
   },
   "devDependencies": {
+    "@playwright/test": "^1.62.1",
     "concurrently": "^9.1.2",
     "firebase-tools": "^13.30.0"
   },

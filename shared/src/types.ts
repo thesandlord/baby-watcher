@@ -15,6 +15,7 @@ export interface ScheduleSlot {
   end: string;
   watcherId: string | null;
   watcherName: string;
+  isManualOverride?: boolean;
 }
 
 export interface CalendarExtractionResult {

@@ -1,9 +1,6 @@
 import { useRef, useState } from 'react';
 import { extractCalendarFromImage } from '../lib/openrouter';
-import {
-  regenerateSchedule,
-  saveAvailability,
-} from '../lib/firestore-api';
+import { saveAvailability } from '../lib/firestore-api';
 import { fileToBase64, type UserProfile } from '../lib/utils';
 
 const mockMode = import.meta.env.VITE_MOCK_CALENDAR_EXTRACTION === 'true';
@@ -104,7 +101,6 @@ export function FloatingCameraButton({
         extraction.confidence
       );
 
-      await regenerateSchedule(profile.household.id, date);
       await onUploaded();
       resetModal();
     } catch (err) {
@@ -147,7 +143,7 @@ export function FloatingCameraButton({
               Upload calendar screenshot
             </h2>
             <p className="hero-subtitle">
-              We&apos;ll read your busy times and regenerate the baby-watching schedule.
+              We&apos;ll save your busy times. Generate that day when you&apos;re ready.
             </p>
 
             {mockMode && !previewUrl ? (
