@@ -261,6 +261,32 @@ button {
   margin-bottom: 1rem;
 }
 
+.schedule-header-compact {
+  margin-bottom: 0.75rem;
+}
+
+.day-picker-row {
+  display: block;
+  margin-bottom: 1rem;
+}
+
+.menu-sheet {
+  max-height: min(85vh, 720px);
+  overflow-y: auto;
+}
+
+.menu-sheet-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+
+.menu-button {
+  font-size: 1.15rem;
+}
+
 .schedule-meta {
   display: grid;
   gap: 0.35rem;

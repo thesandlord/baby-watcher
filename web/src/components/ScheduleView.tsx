@@ -2,7 +2,7 @@ import { useState } from 'react';
 import type { DaySchedule } from '@baby-watcher/shared';
 import { memberColor, memberInitials } from '../lib/members';
 import { formatDisplayDate, formatSlotTime, type UserProfile } from '../lib/utils';
-import { ThemeToggle } from './ThemeToggle';
+import { HouseholdMenu } from './HouseholdMenu';
 
 interface ScheduleViewProps {
   profile: UserProfile;
@@ -26,87 +26,33 @@ export function ScheduleView({
   onSignOut,
 }: ScheduleViewProps) {
   const memberIds = profile.household?.members.map((member) => member.userId) ?? [];
-  const [copied, setCopied] = useState(false);
-
-  async function copyInviteCode(code: string) {
-    try {
-      await navigator.clipboard.writeText(code);
-      setCopied(true);
-      window.setTimeout(() => setCopied(false), 2000);
-    } catch {
-      setCopied(false);
-    }
-  }
+  const [menuOpen, setMenuOpen] = useState(false);
 
   return (
     <>
-      <div className="schedule-header">
+      <div className="schedule-header schedule-header-compact">
         <div className="schedule-meta">
-          <span className="schedule-badge">Today&apos;s schedule</span>
           <h1 className="hero-title">{formatDisplayDate(selectedDate)}</h1>
-          <p className="hero-subtitle">30-minute coverage from 8am to 5pm</p>
         </div>
-        <div className="top-bar-actions">
-          <ThemeToggle compact />
-          <button type="button" className="ghost-button" onClick={onSignOut}>
-            Sign out
-          </button>
-        </div>
-      </div>
-
-      <div className="card control-grid" style={{ marginBottom: '1rem' }}>
-        <label>
-          <span className="field-label">Choose day</span>
-          <input
-            className="date-input"
-            type="date"
-            value={selectedDate}
-            onChange={(event) => onDateChange(event.target.value)}
-          />
-        </label>
-
-        <div>
-          <span className="field-label">Household members</span>
-          <div className="member-list">
-            {profile.household?.members.map((member) => (
-              <span key={member.userId} className="member-pill">
-                <span
-                  className="member-avatar"
-                  style={{ background: memberColor(member.userId, memberIds) }}
-                >
-                  {memberInitials(member.displayName)}
-                </span>
-                {member.displayName}
-              </span>
-            ))}
-          </div>
-        </div>
-
-        {profile.household?.inviteCode ? (
-          <div className="invite-chip">
-            <div>
-              <span className="field-label">Invite code</span>
-              <div className="invite-code">{profile.household.inviteCode}</div>
-            </div>
-            <button
-              type="button"
-              className="copy-button"
-              onClick={() => void copyInviteCode(profile.household!.inviteCode!)}
-            >
-              {copied ? 'Copied!' : 'Copy'}
-            </button>
-          </div>
-        ) : null}
-
         <button
           type="button"
-          className="secondary-button"
-          disabled={busy}
-          onClick={onRegenerate}
+          className="icon-button menu-button"
+          aria-label="Open household menu"
+          onClick={() => setMenuOpen(true)}
         >
-          {busy ? 'Working...' : 'Regenerate schedule'}
+          ☰
         </button>
       </div>
+
+      <label className="day-picker-row">
+        <span className="field-label">Choose day</span>
+        <input
+          className="date-input"
+          type="date"
+          value={selectedDate}
+          onChange={(event) => onDateChange(event.target.value)}
+        />
+      </label>
 
       {error ? <div className="error-banner">{error}</div> : null}
 
@@ -153,6 +99,20 @@ export function ScheduleView({
           </div>
         ) : null}
       </div>
+
+      <HouseholdMenu
+        profile={profile}
+        busy={busy}
+        open={menuOpen}
+        onClose={() => setMenuOpen(false)}
+        onRegenerate={() => {
+          onRegenerate();
+        }}
+        onSignOut={() => {
+          setMenuOpen(false);
+          onSignOut();
+        }}
+      />
     </>
   );
 }
