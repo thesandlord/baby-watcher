@@ -8,7 +8,12 @@ import {
   type User,
 } from 'firebase/auth';
 import type { DaySchedule } from '@baby-watcher/shared';
-import { auth, googleProvider, getProfile, getSchedule, regenerateSchedule } from './lib/firebase';
+import { auth, googleProvider } from './lib/firebase';
+import {
+  getProfile,
+  loadOrGenerateSchedule,
+  regenerateSchedule,
+} from './lib/firestore-api';
 import { todayIsoDate, type UserProfile } from './lib/utils';
 import { LoginScreen } from './components/LoginScreen';
 import { OnboardingScreen } from './components/OnboardingScreen';
@@ -35,8 +40,7 @@ export default function App() {
       }
 
       try {
-        const response = await getProfile();
-        setProfile((response.data as { profile: UserProfile | null }).profile);
+        setProfile(await getProfile());
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Failed to load profile.');
       } finally {
@@ -54,11 +58,14 @@ export default function App() {
   }, [user, profile?.household?.id, selectedDate]);
 
   async function loadSchedule(date: string) {
+    if (!profile?.household) {
+      return;
+    }
+
     setBusy(true);
     setError(null);
     try {
-      const response = await getSchedule({ date });
-      setSchedule((response.data as { schedule: DaySchedule }).schedule);
+      setSchedule(await loadOrGenerateSchedule(profile.household.id, date));
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load schedule.');
     } finally {
@@ -67,11 +74,14 @@ export default function App() {
   }
 
   async function handleRegenerate() {
+    if (!profile?.household) {
+      return;
+    }
+
     setBusy(true);
     setError(null);
     try {
-      const response = await regenerateSchedule({ date: selectedDate });
-      setSchedule((response.data as { schedule: DaySchedule }).schedule);
+      setSchedule(await regenerateSchedule(profile.household.id, selectedDate));
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to regenerate schedule.');
     } finally {
@@ -80,9 +90,11 @@ export default function App() {
   }
 
   async function refreshProfile() {
-    const response = await getProfile();
-    setProfile((response.data as { profile: UserProfile | null }).profile);
-    await loadSchedule(selectedDate);
+    const nextProfile = await getProfile();
+    setProfile(nextProfile);
+    if (nextProfile?.household) {
+      setSchedule(await loadOrGenerateSchedule(nextProfile.household.id, selectedDate));
+    }
   }
 
   if (loading) {
@@ -121,6 +133,7 @@ export default function App() {
       />
 
       <FloatingCameraButton
+        profile={profile}
         selectedDate={selectedDate}
         onUploaded={refreshProfile}
         onError={setError}

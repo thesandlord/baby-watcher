@@ -36,9 +36,9 @@ export async function extractCalendarFromImage(
   mimeType: string,
   hintedDate?: string
 ): Promise<CalendarExtractionResult> {
-  const apiKey = process.env.OPENROUTER_API_KEY;
+  const apiKey = import.meta.env.VITE_OPENROUTER_API_KEY;
   if (!apiKey) {
-    throw new Error('OPENROUTER_API_KEY is not configured');
+    throw new Error('VITE_OPENROUTER_API_KEY is not configured');
   }
 
   const dateHint = hintedDate
@@ -63,11 +63,11 @@ export async function extractCalendarFromImage(
     headers: {
       Authorization: `Bearer ${apiKey}`,
       'Content-Type': 'application/json',
-      'HTTP-Referer': 'https://baby-watcher.app',
+      'HTTP-Referer': typeof window !== 'undefined' ? window.location.origin : 'https://baby-watcher.app',
       'X-Title': 'Baby Watcher',
     },
     body: JSON.stringify({
-      model: process.env.OPENROUTER_VISION_MODEL ?? DEFAULT_VISION_MODEL,
+      model: import.meta.env.VITE_OPENROUTER_VISION_MODEL ?? DEFAULT_VISION_MODEL,
       messages,
       temperature: 0,
       response_format: { type: 'json_object' },
@@ -96,8 +96,7 @@ function parseExtractionResult(raw: string): CalendarExtractionResult {
 
   const busySlots = normalizeBusySlots(parsed.busySlots ?? []);
   const date = typeof parsed.date === 'string' && parsed.date.length > 0 ? parsed.date : null;
-  const needsDateConfirmation =
-    parsed.needsDateConfirmation ?? date === null;
+  const needsDateConfirmation = parsed.needsDateConfirmation ?? date === null;
 
   return {
     date,

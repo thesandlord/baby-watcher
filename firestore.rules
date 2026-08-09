@@ -17,6 +17,14 @@ service cloud.firestore {
       return signedIn() && userHousehold() == householdId;
     }
 
+    function isJoiningHousehold(householdId) {
+      return signedIn()
+        && request.auth.uid in request.resource.data.memberIds
+        && !(request.auth.uid in resource.data.memberIds)
+        && request.resource.data.memberIds.size() == resource.data.memberIds.size() + 1
+        && request.resource.data.inviteCode == resource.data.inviteCode;
+    }
+
     match /users/{userId} {
       allow read: if signedIn() && (
         isSelf(userId) ||
@@ -26,18 +34,25 @@ service cloud.firestore {
     }
 
     match /households/{householdId} {
-      allow read: if inHousehold(householdId);
-      allow create: if signedIn();
-      allow update: if inHousehold(householdId);
+      allow read: if signedIn();
+      allow create: if signedIn()
+        && request.auth.uid in request.resource.data.memberIds
+        && request.resource.data.memberIds.size() == 1;
+      allow update: if inHousehold(householdId) || isJoiningHousehold(householdId);
 
       match /availability/{docId} {
         allow read: if inHousehold(householdId);
-        allow write: if false;
+        allow create, update: if inHousehold(householdId)
+          && docId == request.resource.data.date + '_' + request.auth.uid
+          && request.resource.data.userId == request.auth.uid
+          && request.resource.data.date is string;
+        allow delete: if false;
       }
 
       match /schedules/{date} {
         allow read: if inHousehold(householdId);
-        allow write: if false;
+        allow create, update: if inHousehold(householdId);
+        allow delete: if false;
       }
     }
   }

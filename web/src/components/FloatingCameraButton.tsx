@@ -1,15 +1,20 @@
 import { useRef, useState } from 'react';
-import type { DaySchedule } from '@baby-watcher/shared';
-import { uploadCalendar } from '../lib/firebase';
-import { fileToBase64, isDaySchedule } from '../lib/utils';
+import { extractCalendarFromImage } from '../lib/openrouter';
+import {
+  regenerateSchedule,
+  saveAvailability,
+} from '../lib/firestore-api';
+import { fileToBase64, type UserProfile } from '../lib/utils';
 
 interface FloatingCameraButtonProps {
+  profile: UserProfile;
   selectedDate: string;
   onUploaded: () => Promise<void>;
   onError: (message: string | null) => void;
 }
 
 export function FloatingCameraButton({
+  profile,
   selectedDate,
   onUploaded,
   onError,
@@ -45,7 +50,7 @@ export function FloatingCameraButton({
   }
 
   async function submitUpload(dateOverride?: string) {
-    if (!selectedFile) {
+    if (!selectedFile || !profile.household) {
       return;
     }
 
@@ -54,26 +59,33 @@ export function FloatingCameraButton({
 
     try {
       const imageBase64 = await fileToBase64(selectedFile);
-      const response = await uploadCalendar({
+      const extraction = await extractCalendarFromImage(
         imageBase64,
-        mimeType: selectedFile.type || 'image/jpeg',
-        date: dateOverride,
-      });
+        selectedFile.type || 'image/jpeg',
+        dateOverride
+      );
 
-      const data = response.data as {
-        needsDateConfirmation?: boolean;
-        schedule?: DaySchedule;
-      };
-
-      if (data.needsDateConfirmation) {
+      if (extraction.needsDateConfirmation && !dateOverride) {
         setNeedsDateConfirmation(true);
         return;
       }
 
-      if (isDaySchedule(data.schedule)) {
-        await onUploaded();
-        resetModal();
+      const date = extraction.date ?? dateOverride;
+      if (!date) {
+        throw new Error('Could not determine the calendar date. Please provide one.');
       }
+
+      await saveAvailability(
+        profile.household.id,
+        date,
+        profile.displayName,
+        extraction.busySlots,
+        extraction.confidence
+      );
+
+      await regenerateSchedule(profile.household.id, date);
+      await onUploaded();
+      resetModal();
     } catch (err) {
       onError(err instanceof Error ? err.message : 'Upload failed.');
     } finally {

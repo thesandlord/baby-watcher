@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { createHousehold, joinHousehold } from '../lib/firebase';
+import { createHousehold, joinHousehold } from '../lib/firestore-api';
 
 interface OnboardingScreenProps {
   onComplete: () => Promise<void>;
@@ -18,9 +18,8 @@ export function OnboardingScreen({ onComplete }: OnboardingScreenProps) {
     setBusy(true);
     setError(null);
     try {
-      const response = await createHousehold({ displayName });
-      const data = response.data as { inviteCode?: string };
-      setCreatedInviteCode(data.inviteCode ?? null);
+      const result = await createHousehold(displayName);
+      setCreatedInviteCode(result.inviteCode ?? null);
       await onComplete();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to create household.');
@@ -34,7 +33,7 @@ export function OnboardingScreen({ onComplete }: OnboardingScreenProps) {
     setBusy(true);
     setError(null);
     try {
-      await joinHousehold({ displayName, inviteCode });
+      await joinHousehold(displayName, inviteCode);
       await onComplete();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to join household.');
