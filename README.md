@@ -29,7 +29,7 @@ Everything runs client-side: Firebase Auth + Firestore for data, OpenRouter for 
 npm install
 ```
 
-Recommended free vision model: `google/gemma-4-31b-it:free`
+Calendar extraction hardcodes up to 5 free image-capable OpenRouter models (Gemma, Nemotron, then `openrouter/free`) and falls back when one is rate-limited.
 
 4. Run tests:
 

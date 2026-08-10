@@ -25,7 +25,7 @@ export function UploadMeetingsButton({
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [manualDate, setManualDate] = useState(selectedDate);
   const [needsDateConfirmation, setNeedsDateConfirmation] = useState(false);
-  const [busy, setBusy] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
 
   function resetModal() {
     setOpen(false);
@@ -34,6 +34,7 @@ export function UploadMeetingsButton({
     setSelectedFile(null);
     setNeedsDateConfirmation(false);
     setManualDate(selectedDate);
+    setSubmitting(false);
   }
 
   function openUploadModal() {
@@ -52,35 +53,42 @@ export function UploadMeetingsButton({
   }
 
   async function processUpload(dateOverride?: string) {
-    if (!profile.household || (!mockMode && !selectedFile)) return;
-    setBusy(true);
+    if (submitting || !profile.household || (!mockMode && !selectedFile)) return;
+
+    // Capture inputs, then close immediately on submit so the sheet does not linger.
+    setSubmitting(true);
+    const householdId = profile.household.id;
+    const displayName = profile.displayName;
+    const file = selectedFile;
+    const imageBase64 = file ? await fileToBase64(file) : 'mock-calendar-image';
+    const mimeType = file?.type || 'image/jpeg';
+    resetModal();
     onError(null);
+
     try {
-      const imageBase64 = selectedFile ? await fileToBase64(selectedFile) : 'mock-calendar-image';
-      const extraction = await extractCalendarFromImage(
-        imageBase64,
-        selectedFile?.type || 'image/jpeg',
-        dateOverride
-      );
+      const extraction = await extractCalendarFromImage(imageBase64, mimeType, dateOverride);
       if (extraction.needsDateConfirmation && !dateOverride) {
+        setOpen(true);
         setNeedsDateConfirmation(true);
+        setManualDate(selectedDate);
+        if (file) {
+          setSelectedFile(file);
+          setPreviewUrl(URL.createObjectURL(file));
+        }
         return;
       }
       const date = extraction.date ?? dateOverride;
       if (!date) throw new Error('Could not determine the calendar date. Please provide one.');
       await saveAvailability(
-        profile.household.id,
+        householdId,
         date,
-        profile.displayName,
+        displayName,
         extraction.busySlots,
         extraction.confidence
       );
       await onUploaded();
-      resetModal();
     } catch (err) {
       onError(err instanceof Error ? err.message : 'Upload failed.');
-    } finally {
-      setBusy(false);
     }
   }
 
@@ -154,10 +162,10 @@ export function UploadMeetingsButton({
                   <button
                     type="button"
                     className="secondary-button sample-calendar-button"
-                    disabled={busy}
+                    disabled={submitting}
                     onClick={() => void processUpload(selectedDate)}
                   >
-                    {busy ? 'Uploading...' : 'Use sample calendar'}
+                    {submitting ? 'Uploading...' : 'Use sample calendar'}
                   </button>
                 ) : null}
                 <button type="button" className="ghost-button" onClick={resetModal}>
@@ -178,10 +186,10 @@ export function UploadMeetingsButton({
                 <button
                   type="button"
                   className="primary-button"
-                  disabled={busy}
+                  disabled={submitting}
                   onClick={() => void processUpload(manualDate)}
                 >
-                  {busy ? 'Uploading...' : 'Confirm day and upload'}
+                  {submitting ? 'Uploading...' : 'Confirm day and upload'}
                 </button>
               </div>
             ) : (
@@ -189,10 +197,10 @@ export function UploadMeetingsButton({
                 <button
                   type="button"
                   className="primary-button"
-                  disabled={busy}
+                  disabled={submitting}
                   onClick={() => void processUpload(selectedDate)}
                 >
-                  {busy ? 'Uploading...' : 'Upload for selected day'}
+                  {submitting ? 'Uploading...' : 'Upload for selected day'}
                 </button>
                 <button type="button" className="ghost-button" onClick={resetModal}>
                   Cancel
