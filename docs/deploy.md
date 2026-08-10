@@ -56,13 +56,7 @@ Also create a **`production` environment** in GitHub (Settings → Environments)
 | `VITE_FIREBASE_APP_ID` | Firebase web app ID |
 | `VITE_OPENROUTER_API_KEY` | OpenRouter API key for calendar extraction |
 
-### Optional
-
-| Secret | Description |
-| --- | --- |
-| `VITE_OPENROUTER_VISION_MODEL` | Defaults to `google/gemma-4-31b-it:free` if unset |
-
-Note: `VITE_FIREBASE_PROJECT_ID` is set automatically from `FIREBASE_PROJECT_ID` in the workflow.
+Note: `VITE_FIREBASE_PROJECT_ID` is set automatically from `FIREBASE_PROJECT_ID` in the workflow. Vision models are hardcoded in the app (free OpenRouter fallbacks).
 
 ## Manual deploy trigger
 
