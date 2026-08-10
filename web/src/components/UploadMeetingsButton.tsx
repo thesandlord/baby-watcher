@@ -130,7 +130,9 @@ export function UploadMeetingsButton({
               </div>
             ) : null}
             {previewUrl ? (
-              <img src={previewUrl} alt="Calendar preview" className="preview-image" />
+              <div className="preview-viewbox">
+                <img src={previewUrl} alt="Calendar preview" className="preview-image" />
+              </div>
             ) : null}
             {!selectedFile ? (
               <div className="upload-source-options">

@@ -759,11 +759,24 @@ button {
 
 .modal-sheet {
   width: min(480px, 100%);
+  max-height: calc(100dvh - 2rem);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
   background: var(--surface-strong);
   border: 1px solid var(--border);
   border-radius: 1.35rem 1.35rem 0 0;
   padding: 1.1rem;
   box-shadow: var(--shadow);
+}
+
+.modal-sheet .hero-title,
+.modal-sheet .hero-subtitle,
+.modal-sheet .info-banner,
+.modal-actions,
+.upload-source-options,
+.modal-sheet .stack {
+  flex-shrink: 0;
 }
 
 .modal-actions {
@@ -784,11 +797,26 @@ button {
   grid-column: 1 / -1;
 }
 
-.preview-image {
-  width: 100%;
+.preview-viewbox {
+  flex: 1 1 auto;
+  min-height: 0;
+  margin-top: 0.85rem;
+  max-height: calc(100dvh - 2rem - 2.2rem - 9.5rem);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
   border-radius: 1rem;
   border: 1px solid var(--border);
-  margin-top: 0.85rem;
+}
+
+.preview-image {
+  display: block;
+  max-width: 100%;
+  max-height: 100%;
+  width: auto;
+  height: auto;
+  object-fit: contain;
 }
 
 .loading-card {
