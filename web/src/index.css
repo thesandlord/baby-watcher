@@ -267,12 +267,14 @@ button {
 
 .week-toolbar {
   align-items: center;
+  margin-bottom: 0.65rem;
 }
 
 .week-toolbar-actions {
   display: flex;
   align-items: center;
   gap: 0.4rem;
+  flex: 0 0 auto;
 }
 
 .today-button {
@@ -302,8 +304,7 @@ button {
 }
 
 .schedule-meta {
-  display: grid;
-  gap: 0.35rem;
+  min-width: 0;
 }
 
 .schedule-badge {
@@ -317,6 +318,11 @@ button {
   font-weight: 700;
   letter-spacing: 0.04em;
   text-transform: uppercase;
+}
+
+.upload-meetings-button {
+  font-size: 1.65rem;
+  line-height: 1;
 }
 
 .control-grid {
@@ -458,8 +464,8 @@ button {
 
 .week-grid {
   display: grid;
-  grid-template-columns: 4.8rem repeat(5, minmax(145px, 1fr));
-  min-width: 850px;
+  grid-template-columns: 4.8rem repeat(5, minmax(175px, 1fr));
+  min-width: 952px;
 }
 
 .week-grid-row {
@@ -612,7 +618,9 @@ button {
 
 .week-day-action {
   display: grid;
-  align-items: center;
+  grid-template-rows: auto auto;
+  gap: 0.35rem;
+  justify-items: stretch;
   border-left: 1px solid var(--border);
 }
 
@@ -620,6 +628,47 @@ button {
   width: 100%;
   padding: 0.65rem 0.45rem;
   font-size: 0.76rem;
+}
+
+.upload-status-button {
+  width: 100%;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 0.55rem 0.45rem;
+  background: var(--surface-muted);
+  color: var(--text-muted);
+  font-size: 0.68rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.upload-status-list {
+  display: grid;
+  gap: 0.55rem;
+  margin-top: 1rem;
+}
+
+.upload-status-person {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: 0.9rem;
+  background: var(--surface-muted);
+}
+
+.upload-status-person strong {
+  font-size: 0.78rem;
+}
+
+.has-uploaded {
+  color: var(--success);
+}
+
+.not-uploaded {
+  color: var(--text-muted);
 }
 
 .week-empty-hint {
@@ -697,20 +746,6 @@ button {
   margin-top: 0.75rem;
 }
 
-.floating-camera {
-  position: fixed;
-  right: 1rem;
-  bottom: calc(1rem + env(safe-area-inset-bottom));
-  width: 4.1rem;
-  height: 4.1rem;
-  border-radius: 50%;
-  border: none;
-  background: linear-gradient(135deg, var(--accent), #ec4899);
-  color: white;
-  font-size: 1.5rem;
-  box-shadow: 0 18px 40px rgba(99, 102, 241, 0.38);
-}
-
 .modal-backdrop {
   position: fixed;
   inset: 0;
@@ -735,6 +770,18 @@ button {
   display: grid;
   gap: 0.55rem;
   margin-top: 1rem;
+}
+
+.upload-source-options {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.55rem;
+  margin-top: 1rem;
+}
+
+.upload-source-options .ghost-button,
+.upload-source-options .sample-calendar-button {
+  grid-column: 1 / -1;
 }
 
 .preview-image {
@@ -818,25 +865,15 @@ button {
   }
 
   .week-toolbar {
-    align-items: flex-start;
-  }
-
-  .week-toolbar-actions {
-    display: grid;
-    grid-template-columns: repeat(4, auto);
+    gap: 0.45rem;
   }
 
   .today-button {
-    grid-column: 1 / -1;
     padding: 0.45rem 0.75rem;
   }
 
-  .member-legend {
-    flex-wrap: nowrap;
-    overflow-x: auto;
-  }
-
-  .member-legend .member-pill {
-    flex: 0 0 auto;
+  .week-toolbar .hero-title {
+    font-size: 1.3rem;
+    white-space: nowrap;
   }
 }

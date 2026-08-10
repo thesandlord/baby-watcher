@@ -1,4 +1,4 @@
-import { useState, type CSSProperties } from 'react';
+import { useState, type CSSProperties, type ReactNode } from 'react';
 import {
   DndContext,
   PointerSensor,
@@ -30,8 +30,10 @@ interface ScheduleViewProps {
   weekDates: string[];
   activeDate: string;
   uploads: UploadedAvailability[];
+  householdUploads: UploadedAvailability[];
   busy: boolean;
   error: string | null;
+  uploadMeetingsButton: ReactNode;
   onActiveDateChange: (date: string) => void;
   onPreviousWeek: () => void;
   onNextWeek: () => void;
@@ -104,8 +106,10 @@ export function ScheduleView({
   weekDates,
   activeDate,
   uploads,
+  householdUploads,
   busy,
   error,
+  uploadMeetingsButton,
   onActiveDateChange,
   onPreviousWeek,
   onNextWeek,
@@ -119,6 +123,7 @@ export function ScheduleView({
   const memberIds = profile.household?.members.map((member) => member.userId) ?? [];
   const [menuOpen, setMenuOpen] = useState(false);
   const [editing, setEditing] = useState<{ date: string; slot: ScheduleSlot } | null>(null);
+  const [uploadStatusDate, setUploadStatusDate] = useState<string | null>(null);
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
     useSensor(TouchSensor, { activationConstraint: { delay: 200, tolerance: 6 } })
@@ -139,7 +144,6 @@ export function ScheduleView({
     <>
       <div className="schedule-header week-toolbar">
         <div className="schedule-meta">
-          <span className="schedule-badge">Weekday schedule</span>
           <h1 className="hero-title">{formatWeekRange(weekDates)}</h1>
         </div>
         <div className="week-toolbar-actions">
@@ -152,6 +156,7 @@ export function ScheduleView({
           <button type="button" className="icon-button" onClick={onNextWeek} aria-label="Next week">
             ›
           </button>
+          {uploadMeetingsButton}
           <button
             type="button"
             className="icon-button menu-button"
@@ -164,15 +169,6 @@ export function ScheduleView({
       </div>
 
       {error ? <div className="error-banner">{error}</div> : null}
-
-      <div className="member-legend" aria-label="Household member colors">
-        {profile.household?.members.map((member) => (
-          <span key={member.userId} className="member-pill">
-            <span className="legend-dot" style={{ background: memberColor(member.userId, memberIds) }} />
-            {member.displayName}
-          </span>
-        ))}
-      </div>
 
       <DndContext sensors={sensors} onDragEnd={handleDragEnd}>
         <div className="week-scroll">
@@ -192,6 +188,37 @@ export function ScheduleView({
                   <span>{parsed.toLocaleDateString(undefined, { weekday: 'short' })}</span>
                   <strong>{parsed.getDate()}</strong>
                 </button>
+              );
+            })}
+
+            <div className="week-footer-label">Slots</div>
+            {weekDates.map((date) => {
+              const uploadedCount = new Set(
+                householdUploads
+                  .filter((upload) => upload.date === date)
+                  .map((upload) => upload.userId)
+              ).size;
+              return (
+                <div className="week-day-action" key={date}>
+                  <button
+                    type="button"
+                    data-testid={`generate-${date}`}
+                    className={schedules[date] ? 'ghost-button generate-button' : 'primary-button generate-button'}
+                    disabled={busy}
+                    onClick={() => onGenerate(date)}
+                  >
+                    {schedules[date] ? 'Regenerate' : 'Generate slots'}
+                  </button>
+                  <button
+                    type="button"
+                    data-testid={`upload-status-${date}`}
+                    className="upload-status-button"
+                    aria-label={`View upload status for ${formatDisplayDate(date)}`}
+                    onClick={() => setUploadStatusDate(date)}
+                  >
+                    {uploadedCount}/{memberIds.length} uploaded
+                  </button>
+                </div>
               );
             })}
 
@@ -219,21 +246,6 @@ export function ScheduleView({
                 })}
               </div>
             ))}
-
-            <div className="week-footer-label">Slots</div>
-            {weekDates.map((date) => (
-              <div className="week-day-action" key={date}>
-                <button
-                  type="button"
-                  data-testid={`generate-${date}`}
-                  className={schedules[date] ? 'ghost-button generate-button' : 'primary-button generate-button'}
-                  disabled={busy}
-                  onClick={() => onGenerate(date)}
-                >
-                  {schedules[date] ? 'Regenerate' : 'Generate slots'}
-                </button>
-              </div>
-            ))}
           </div>
           {!firstSchedule && !busy ? (
             <div className="week-empty-hint">
@@ -259,6 +271,47 @@ export function ScheduleView({
           onSignOut();
         }}
       />
+
+      {uploadStatusDate ? (
+        <div className="modal-backdrop" role="presentation" onClick={() => setUploadStatusDate(null)}>
+          <div
+            className="modal-sheet"
+            role="dialog"
+            aria-modal="true"
+            aria-label={`Upload status for ${formatDisplayDate(uploadStatusDate)}`}
+            onClick={(event) => event.stopPropagation()}
+          >
+            <h2 className="hero-title" style={{ fontSize: '1.25rem' }}>
+              Schedule uploads
+            </h2>
+            <p className="hero-subtitle">{formatDisplayDate(uploadStatusDate)}</p>
+            <div className="upload-status-list">
+              {profile.household?.members.map((member) => {
+                const hasUploaded = householdUploads.some(
+                  (upload) => upload.date === uploadStatusDate && upload.userId === member.userId
+                );
+                return (
+                  <div className="upload-status-person" key={member.userId}>
+                    <span>{member.displayName}</span>
+                    <strong className={hasUploaded ? 'has-uploaded' : 'not-uploaded'}>
+                      {hasUploaded ? 'Uploaded' : 'Not uploaded'}
+                    </strong>
+                  </div>
+                );
+              })}
+            </div>
+            <div className="modal-actions">
+              <button
+                type="button"
+                className="ghost-button"
+                onClick={() => setUploadStatusDate(null)}
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
 
       {editing ? (
         <div className="modal-backdrop" role="presentation" onClick={() => setEditing(null)}>

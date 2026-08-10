@@ -5,20 +5,21 @@ import { fileToBase64, type UserProfile } from '../lib/utils';
 
 const mockMode = import.meta.env.VITE_MOCK_CALENDAR_EXTRACTION === 'true';
 
-interface FloatingCameraButtonProps {
+interface UploadMeetingsButtonProps {
   profile: UserProfile;
   selectedDate: string;
   onUploaded: () => Promise<void>;
   onError: (message: string | null) => void;
 }
 
-export function FloatingCameraButton({
+export function UploadMeetingsButton({
   profile,
   selectedDate,
   onUploaded,
   onError,
-}: FloatingCameraButtonProps) {
-  const inputRef = useRef<HTMLInputElement>(null);
+}: UploadMeetingsButtonProps) {
+  const cameraInputRef = useRef<HTMLInputElement>(null);
+  const imageInputRef = useRef<HTMLInputElement>(null);
   const [open, setOpen] = useState(false);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -28,6 +29,7 @@ export function FloatingCameraButton({
 
   function resetModal() {
     setOpen(false);
+    if (previewUrl) URL.revokeObjectURL(previewUrl);
     setPreviewUrl(null);
     setSelectedFile(null);
     setNeedsDateConfirmation(false);
@@ -40,59 +42,32 @@ export function FloatingCameraButton({
     setNeedsDateConfirmation(false);
   }
 
-  function handleCameraClick() {
-    if (mockMode) {
-      openUploadModal();
-      return;
-    }
-
-    inputRef.current?.click();
-  }
-
   function handleFileChange(event: React.ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
-    if (!file) {
-      return;
-    }
-
+    if (!file) return;
     setSelectedFile(file);
+    if (previewUrl) URL.revokeObjectURL(previewUrl);
     setPreviewUrl(URL.createObjectURL(file));
-    openUploadModal();
     event.target.value = '';
   }
 
   async function processUpload(dateOverride?: string) {
-    if (!profile.household) {
-      return;
-    }
-
-    if (!mockMode && !selectedFile) {
-      return;
-    }
-
+    if (!profile.household || (!mockMode && !selectedFile)) return;
     setBusy(true);
     onError(null);
-
     try {
-      const imageBase64 = selectedFile
-        ? await fileToBase64(selectedFile)
-        : 'mock-calendar-image';
+      const imageBase64 = selectedFile ? await fileToBase64(selectedFile) : 'mock-calendar-image';
       const extraction = await extractCalendarFromImage(
         imageBase64,
         selectedFile?.type || 'image/jpeg',
         dateOverride
       );
-
       if (extraction.needsDateConfirmation && !dateOverride) {
         setNeedsDateConfirmation(true);
         return;
       }
-
       const date = extraction.date ?? dateOverride;
-      if (!date) {
-        throw new Error('Could not determine the calendar date. Please provide one.');
-      }
-
+      if (!date) throw new Error('Could not determine the calendar date. Please provide one.');
       await saveAvailability(
         profile.household.id,
         date,
@@ -100,7 +75,6 @@ export function FloatingCameraButton({
         extraction.busySlots,
         extraction.confidence
       );
-
       await onUploaded();
       resetModal();
     } catch (err) {
@@ -114,22 +88,27 @@ export function FloatingCameraButton({
     <>
       <button
         type="button"
-        className="floating-camera"
-        aria-label="Upload calendar photo"
-        onClick={handleCameraClick}
+        className="icon-button upload-meetings-button"
+        aria-label="Upload meetings"
+        onClick={openUploadModal}
       >
-        📷
+        +
       </button>
-
       <input
-        ref={inputRef}
+        ref={cameraInputRef}
         type="file"
         accept="image/*"
         capture="environment"
         hidden
         onChange={handleFileChange}
       />
-
+      <input
+        ref={imageInputRef}
+        type="file"
+        accept="image/*"
+        hidden
+        onChange={handleFileChange}
+      />
       {open ? (
         <div className="modal-backdrop" role="presentation" onClick={resetModal}>
           <div
@@ -145,18 +124,45 @@ export function FloatingCameraButton({
             <p className="hero-subtitle">
               We&apos;ll save your busy times. Generate that day when you&apos;re ready.
             </p>
-
             {mockMode && !previewUrl ? (
               <div className="info-banner">
                 Local mock mode: sample busy slots will be used for this upload.
               </div>
             ) : null}
-
             {previewUrl ? (
               <img src={previewUrl} alt="Calendar preview" className="preview-image" />
             ) : null}
-
-            {needsDateConfirmation ? (
+            {!selectedFile ? (
+              <div className="upload-source-options">
+                <button
+                  type="button"
+                  className="primary-button"
+                  onClick={() => cameraInputRef.current?.click()}
+                >
+                  Take a photo
+                </button>
+                <button
+                  type="button"
+                  className="secondary-button"
+                  onClick={() => imageInputRef.current?.click()}
+                >
+                  Upload an image
+                </button>
+                {mockMode ? (
+                  <button
+                    type="button"
+                    className="secondary-button sample-calendar-button"
+                    disabled={busy}
+                    onClick={() => void processUpload(selectedDate)}
+                  >
+                    {busy ? 'Uploading...' : 'Use sample calendar'}
+                  </button>
+                ) : null}
+                <button type="button" className="ghost-button" onClick={resetModal}>
+                  Cancel
+                </button>
+              </div>
+            ) : needsDateConfirmation ? (
               <div className="stack" style={{ marginTop: '1rem' }}>
                 <label>
                   <span className="field-label">Which day is this calendar for?</span>
@@ -184,11 +190,7 @@ export function FloatingCameraButton({
                   disabled={busy}
                   onClick={() => void processUpload(selectedDate)}
                 >
-                  {busy
-                    ? 'Uploading...'
-                    : mockMode
-                      ? 'Use sample calendar'
-                      : 'Upload for selected day'}
+                  {busy ? 'Uploading...' : 'Upload for selected day'}
                 </button>
                 <button type="button" className="ghost-button" onClick={resetModal}>
                   Cancel

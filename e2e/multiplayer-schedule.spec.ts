@@ -5,6 +5,7 @@ import {
   closeProfile,
   createHousehold,
   dragSlot,
+  expectMembersInProfile,
   generateDay,
   joinHousehold,
   openProfile,
@@ -32,16 +33,32 @@ test('two players share generation, overrides, swaps, uploads, and regeneration'
     await joinHousehold(bob, 'Bob', inviteCode);
 
     await alice.reload();
-    await expect(alice.getByText('Alice', { exact: true }).first()).toBeVisible();
-    await expect(alice.getByText('Bob', { exact: true }).first()).toBeVisible();
-    await expect(bob.getByText('Alice', { exact: true }).first()).toBeVisible();
-    await expect(bob.getByText('Bob', { exact: true }).first()).toBeVisible();
+    await expectMembersInProfile(alice, ['Alice', 'Bob']);
+    await expectMembersInProfile(bob, ['Alice', 'Bob']);
 
+    await expect(alice.getByRole('heading', { level: 1 })).toHaveText('Aug 10-15');
     await expect(alice.getByTestId(`slot-${TEST_DATE}-08:00`)).toHaveCount(0);
     await expect(alice.getByTestId(`generate-${TEST_DATE}`)).toHaveText('Generate slots');
+    await expect(alice.getByTestId(`upload-status-${TEST_DATE}`)).toHaveText('0/2 uploaded');
+
+    await alice.getByTestId(`upload-status-${TEST_DATE}`).click();
+    const initialUploadStatus = alice.getByRole('dialog', {
+      name: 'Upload status for Tuesday, Aug 11',
+    });
+    await expect(initialUploadStatus).toContainText('AliceNot uploaded');
+    await expect(initialUploadStatus).toContainText('BobNot uploaded');
+    await initialUploadStatus.getByRole('button', { name: 'Close' }).click();
 
     await uploadAvailability(alice);
     await expect(alice.getByTestId(`slot-${TEST_DATE}-08:00`)).toHaveCount(0);
+    await expect(alice.getByTestId(`upload-status-${TEST_DATE}`)).toHaveText('1/2 uploaded');
+    await alice.getByTestId(`upload-status-${TEST_DATE}`).click();
+    const partialUploadStatus = alice.getByRole('dialog', {
+      name: 'Upload status for Tuesday, Aug 11',
+    });
+    await expect(partialUploadStatus).toContainText('AliceUploaded');
+    await expect(partialUploadStatus).toContainText('BobNot uploaded');
+    await partialUploadStatus.getByRole('button', { name: 'Close' }).click();
     await openProfile(alice);
     await expect(alice.getByTestId(`upload-${TEST_DATE}`)).toContainText('2 busy periods');
     await closeProfile(alice);
@@ -50,6 +67,14 @@ test('two players share generation, overrides, swaps, uploads, and regeneration'
     await expect(bob.getByTestId(`upload-${TEST_DATE}`)).toHaveCount(0);
     await closeProfile(bob);
     await uploadAvailability(bob);
+    await expect(bob.getByTestId(`upload-status-${TEST_DATE}`)).toHaveText('2/2 uploaded');
+    await bob.getByTestId(`upload-status-${TEST_DATE}`).click();
+    const completeUploadStatus = bob.getByRole('dialog', {
+      name: 'Upload status for Tuesday, Aug 11',
+    });
+    await expect(completeUploadStatus).toContainText('AliceUploaded');
+    await expect(completeUploadStatus).toContainText('BobUploaded');
+    await completeUploadStatus.getByRole('button', { name: 'Close' }).click();
 
     await generateDay(alice);
     await expect(alice.locator(`[data-testid^="slot-${TEST_DATE}-"]`)).toHaveCount(18);
