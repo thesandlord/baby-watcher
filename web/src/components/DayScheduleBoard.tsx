@@ -563,6 +563,7 @@ export function DayScheduleBoard({
   const boardRef = useRef<HTMLDivElement>(null);
   const slotsStartRef = useRef<HTMLDivElement>(null);
   const slotsEndRef = useRef<HTMLDivElement>(null);
+  const watchColumnRef = useRef<HTMLDivElement>(null);
   const meetingsTrackRef = useRef<HTMLDivElement>(null);
   const [trackHeight, setTrackHeight] = useState(0);
   const [meetingForm, setMeetingForm] = useState<MeetingFormState | null>(null);
@@ -805,7 +806,7 @@ export function DayScheduleBoard({
             ))}
           </div>
 
-          <div className="day-watch-column">
+          <div className="day-watch-column" ref={watchColumnRef}>
             {timeSlots.map((timeSlot, rowIndex) => {
               const slot = schedule?.slots[rowIndex];
               return (
@@ -874,7 +875,7 @@ export function DayScheduleBoard({
         boardRef={boardRef}
         slotsStartRef={slotsStartRef}
         slotsEndRef={slotsEndRef}
-        trackRef={meetingsTrackRef}
+        trackRef={watchColumnRef}
       />
 
       {meetingForm ? (

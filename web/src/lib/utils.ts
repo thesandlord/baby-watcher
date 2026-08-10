@@ -1,4 +1,9 @@
-import type { DaySchedule } from '@baby-watcher/shared';
+import {
+  parseTime,
+  WORKDAY_END,
+  WORKDAY_START,
+  type ScheduleSlot,
+} from '@baby-watcher/shared';
 import {
   APP_TIMEZONE,
   formatCalendarDate,
@@ -120,6 +125,30 @@ export function formatDisplayDate(date: string): string {
 
 export function formatSlotTime(time: string): string {
   return formatWallClockTime(time);
+}
+
+/** Returns the watch slot covering the current moment, or null if outside the workday. */
+export function activeWatchSlotAtNow(
+  slots: ScheduleSlot[],
+  now = new Date(),
+  workdayStart = WORKDAY_START,
+  workdayEnd = WORKDAY_END
+): ScheduleSlot | null {
+  const nowMinutes = nowMinutesInAppTimezone(now);
+  const workdayStartMinutes = parseTime(workdayStart);
+  const workdayEndMinutes = parseTime(workdayEnd);
+
+  if (nowMinutes < workdayStartMinutes || nowMinutes >= workdayEndMinutes) {
+    return null;
+  }
+
+  return (
+    slots.find((slot) => {
+      const slotStart = parseTime(slot.start);
+      const slotEnd = parseTime(slot.end);
+      return nowMinutes >= slotStart && nowMinutes < slotEnd;
+    }) ?? null
+  );
 }
 
 /** Returns 0–1 position through the workday, or null if outside the range. */
