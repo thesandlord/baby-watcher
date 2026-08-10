@@ -50,11 +50,35 @@ function parseAvailabilityDoc(
 }
 
 function requireUserId(): string {
-  const uid = auth.currentUser?.uid;
+  return resolveUserId();
+}
+
+function resolveUserId(explicitUid?: string): string {
+  const uid = explicitUid ?? auth.currentUser?.uid;
   if (!uid) {
     throw new Error('Sign in required.');
   }
   return uid;
+}
+
+async function findHouseholdIdForMember(uid: string): Promise<string | null> {
+  const snapshot = await getDocs(
+    query(collection(db, 'households'), where('memberIds', 'array-contains', uid))
+  );
+  if (snapshot.empty) {
+    return null;
+  }
+  return snapshot.docs[0].id;
+}
+
+async function loadHousehold(householdId: string) {
+  const members = await getHouseholdMembers(householdId);
+  const householdDoc = await getDoc(doc(db, 'households', householdId));
+  return {
+    id: householdId,
+    inviteCode: (householdDoc.data()?.inviteCode as string | null) ?? null,
+    members,
+  };
 }
 
 async function getHouseholdMembers(householdId: string) {
@@ -93,28 +117,63 @@ async function getAvailabilityForDay(
   return availability;
 }
 
-export async function getProfile(): Promise<UserProfile | null> {
-  const uid = requireUserId();
-  const profileDoc = await getDoc(doc(db, 'users', uid));
+export async function getProfile(uid?: string): Promise<UserProfile | null> {
+  const resolvedUid = resolveUserId(uid);
+  const profileDoc = await getDoc(doc(db, 'users', resolvedUid));
+
   if (!profileDoc.exists()) {
-    return null;
-  }
+    const recoveredHouseholdId = await findHouseholdIdForMember(resolvedUid);
+    if (!recoveredHouseholdId) {
+      return null;
+    }
 
-  const profile = profileDoc.data();
-  let household = null;
+    const email = auth.currentUser?.email ?? null;
+    const displayName =
+      auth.currentUser?.displayName ?? email?.split('@')[0] ?? 'Member';
 
-  if (profile.householdId) {
-    const members = await getHouseholdMembers(profile.householdId);
-    const householdDoc = await getDoc(doc(db, 'households', profile.householdId));
-    household = {
-      id: profile.householdId,
-      inviteCode: (householdDoc.data()?.inviteCode as string | null) ?? null,
-      members,
+    await setDoc(
+      doc(db, 'users', resolvedUid),
+      {
+        displayName,
+        householdId: recoveredHouseholdId,
+        email,
+        role: 'watcher',
+        updatedAt: serverTimestamp(),
+      },
+      { merge: true }
+    );
+
+    return {
+      uid: resolvedUid,
+      displayName,
+      email,
+      role: 'watcher',
+      household: await loadHousehold(recoveredHouseholdId),
     };
   }
 
+  const profile = profileDoc.data();
+  let householdId = profile.householdId as string | undefined;
+
+  if (!householdId) {
+    const recoveredHouseholdId = await findHouseholdIdForMember(resolvedUid);
+    if (recoveredHouseholdId) {
+      householdId = recoveredHouseholdId;
+      await setDoc(
+        doc(db, 'users', resolvedUid),
+        {
+          householdId: recoveredHouseholdId,
+          updatedAt: serverTimestamp(),
+        },
+        { merge: true }
+      );
+    }
+  }
+
+  const household = householdId ? await loadHousehold(householdId) : null;
+
   return {
-    uid,
+    uid: resolvedUid,
     displayName: profile.displayName as string,
     email: (profile.email as string | null) ?? auth.currentUser?.email ?? null,
     role: normalizeHouseholdRole(profile.role),

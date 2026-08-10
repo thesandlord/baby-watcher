@@ -5,9 +5,10 @@ import { ThemeToggle } from './ThemeToggle';
 
 interface OnboardingScreenProps {
   onComplete: () => Promise<void>;
+  loadError?: string | null;
 }
 
-export function OnboardingScreen({ onComplete }: OnboardingScreenProps) {
+export function OnboardingScreen({ onComplete, loadError }: OnboardingScreenProps) {
   const [mode, setMode] = useState<'create' | 'join' | 'view'>('create');
   const [displayName, setDisplayName] = useState('');
   const [inviteCode, setInviteCode] = useState('');
@@ -69,6 +70,7 @@ export function OnboardingScreen({ onComplete }: OnboardingScreenProps) {
           </div>
         ) : null}
 
+        {loadError ? <div className="error-banner">{loadError}</div> : null}
         {error ? <div className="error-banner">{error}</div> : null}
 
         <div className="mode-switch">
