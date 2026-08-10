@@ -58,6 +58,15 @@ export async function closeProfile(page: Page): Promise<void> {
   await expect(page.getByRole('dialog', { name: 'Household menu' })).toBeHidden();
 }
 
+export async function expectMembersInProfile(page: Page, names: string[]): Promise<void> {
+  await openProfile(page);
+  const menu = page.getByRole('dialog', { name: 'Household menu' });
+  for (const name of names) {
+    await expect(menu).toContainText(name);
+  }
+  await closeProfile(page);
+}
+
 export async function uploadAvailability(page: Page, date = TEST_DATE): Promise<void> {
   await page.getByTestId(`day-${date}`).click();
   await page.getByRole('button', { name: 'Upload meetings' }).click();

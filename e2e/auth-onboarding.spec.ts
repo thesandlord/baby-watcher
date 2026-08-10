@@ -2,6 +2,7 @@ import { expect, test } from '@playwright/test';
 import {
   PASSWORD,
   createHousehold,
+  expectMembersInProfile,
   openProfile,
   signIn,
   signUp,
@@ -15,7 +16,7 @@ test('creates a household, persists the session, toggles theme, and signs out', 
 
   await page.reload();
   await expect(page.getByTestId('week-grid')).toBeVisible();
-  await expect(page.getByText('Owner Alice', { exact: true }).first()).toBeVisible();
+  await expectMembersInProfile(page, ['Owner Alice']);
 
   await openProfile(page);
   const themeButton = page.getByRole('button', { name: 'Switch to dark mode' });
@@ -26,7 +27,7 @@ test('creates a household, persists the session, toggles theme, and signs out', 
   await expect(page.getByRole('heading', { name: 'Baby Watcher' })).toBeVisible();
 
   await signIn(page, email);
-  await expect(page.getByText('Owner Alice', { exact: true }).first()).toBeVisible();
+  await expectMembersInProfile(page, ['Owner Alice']);
 });
 
 test('shows errors for invalid credentials and invite codes', async ({ page }) => {

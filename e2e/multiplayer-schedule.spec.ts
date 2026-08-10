@@ -5,6 +5,7 @@ import {
   closeProfile,
   createHousehold,
   dragSlot,
+  expectMembersInProfile,
   generateDay,
   joinHousehold,
   openProfile,
@@ -32,10 +33,8 @@ test('two players share generation, overrides, swaps, uploads, and regeneration'
     await joinHousehold(bob, 'Bob', inviteCode);
 
     await alice.reload();
-    await expect(alice.getByText('Alice', { exact: true }).first()).toBeVisible();
-    await expect(alice.getByText('Bob', { exact: true }).first()).toBeVisible();
-    await expect(bob.getByText('Alice', { exact: true }).first()).toBeVisible();
-    await expect(bob.getByText('Bob', { exact: true }).first()).toBeVisible();
+    await expectMembersInProfile(alice, ['Alice', 'Bob']);
+    await expectMembersInProfile(bob, ['Alice', 'Bob']);
 
     await expect(alice.getByRole('heading', { level: 1 })).toHaveText('Aug 10-15');
     await expect(alice.getByTestId(`slot-${TEST_DATE}-08:00`)).toHaveCount(0);
