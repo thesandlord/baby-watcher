@@ -28,6 +28,7 @@ import {
   shiftWeekday,
   todayIsoDate,
   viewDatesFor,
+  isViewerProfile,
   type ScheduleViewMode,
   type UserProfile,
 } from './lib/utils';
@@ -132,14 +133,14 @@ function AppContent() {
   }, [profile?.household?.id, viewDatesKey]);
 
   useEffect(() => {
-    if (!profile?.household) {
+    if (!profile?.household || isViewerProfile(profile)) {
       return;
     }
 
     void deleteMyAvailabilityBefore(profile.household.id, todayIsoDate()).catch((err) => {
       console.error('Failed to clean up old availability:', err);
     });
-  }, [profile?.household?.id]);
+  }, [profile?.household?.id, profile?.role]);
 
   async function handleGenerate(date: string) {
     if (!profile?.household) {
@@ -305,6 +306,8 @@ function AppContent() {
     return <OnboardingScreen onComplete={refreshProfile} />;
   }
 
+  const canEditSchedule = !isViewerProfile(profile);
+
   return (
     <div className="app-shell app-shell--schedule" data-testid="app-shell" data-busy={busy}>
       <ScheduleView
@@ -317,13 +320,16 @@ function AppContent() {
         householdUploads={householdUploads}
         busy={busy}
         error={error}
-        uploadMeetingsButton={(
-          <UploadMeetingsButton
-            profile={profile}
-            selectedDate={activeDate}
-            viewDates={viewDates}
-          />
-        )}
+        canEditSchedule={canEditSchedule}
+        uploadMeetingsButton={
+          canEditSchedule ? (
+            <UploadMeetingsButton
+              profile={profile}
+              selectedDate={activeDate}
+              viewDates={viewDates}
+            />
+          ) : null
+        }
         onActiveDateChange={selectDate}
         onViewModeChange={setViewMode}
         onPreviousPeriod={() => navigatePeriod(-1)}

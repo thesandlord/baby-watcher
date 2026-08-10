@@ -26,6 +26,7 @@ import {
   formatDisplayDate,
   formatSlotTime,
   formatViewHeading,
+  householdWatchers,
   todayIsoDate,
   type ScheduleViewMode,
   type UserProfile,
@@ -45,6 +46,7 @@ interface ScheduleViewProps {
   householdUploads: UploadedAvailability[];
   busy: boolean;
   error: string | null;
+  canEditSchedule: boolean;
   uploadMeetingsButton: ReactNode;
   onActiveDateChange: (date: string) => void;
   onViewModeChange: (mode: ScheduleViewMode) => void;
@@ -125,6 +127,7 @@ export function ScheduleView({
   householdUploads,
   busy,
   error,
+  canEditSchedule,
   uploadMeetingsButton,
   onActiveDateChange,
   onViewModeChange,
@@ -139,7 +142,8 @@ export function ScheduleView({
   onCleanupOldUploads,
   onSignOut,
 }: ScheduleViewProps) {
-  const memberIds = profile.household?.members.map((member) => member.userId) ?? [];
+  const watchers = householdWatchers(profile.household?.members ?? []);
+  const memberIds = watchers.map((member) => member.userId);
   const [menuOpen, setMenuOpen] = useState(false);
   const [editing, setEditing] = useState<{ date: string; slot: ScheduleSlot } | null>(null);
   const [uploadStatusDate, setUploadStatusDate] = useState<string | null>(null);
@@ -147,12 +151,14 @@ export function ScheduleView({
     useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
     useSensor(TouchSensor, { activationConstraint: { delay: 200, tolerance: 6 } })
   );
+  const slotEditingDisabled = busy || !canEditSchedule;
   const firstSchedule = viewDates.map((date) => schedules[date]).find(Boolean);
   const timeSlots = firstSchedule?.slots ?? generateTimeSlots(WORKDAY_START, WORKDAY_END, SLOT_MINUTES);
   const gridWrapperRef = useRef<HTMLDivElement>(null);
   const slotsStartRef = useRef<HTMLDivElement>(null);
   const slotsEndRef = useRef<HTMLDivElement>(null);
-  const todayColumnRef = useRef<HTMLDivElement>(null);
+  const columnsStartRef = useRef<HTMLDivElement>(null);
+  const columnsEndRef = useRef<HTMLDivElement>(null);
   const [now, setNow] = useState(() => new Date());
   const today = todayIsoDate();
   const nowLineFraction = currentTimeLineFraction(now, WORKDAY_START, WORKDAY_END);
@@ -161,6 +167,7 @@ export function ScheduleView({
   const isOnWatch = activeWatchSlot?.watcherId === profile.uid;
 
   useEffect(() => {
+    setNow(new Date());
     const intervalId = window.setInterval(() => setNow(new Date()), 60_000);
     return () => window.clearInterval(intervalId);
   }, []);
@@ -276,12 +283,13 @@ export function ScheduleView({
               timeSlots={timeSlots}
               memberIds={memberIds}
               busy={busy}
+              canEditSchedule={canEditSchedule}
               showNowLine={showNowLine}
               nowLineFraction={nowLineFraction ?? 0}
               onGenerate={onGenerate}
               onUploadStatus={setUploadStatusDate}
               onEditSlot={(date, slot) => setEditing({ date, slot })}
-              onUpdateBusySlots={onUpdateBusySlots}
+              onUpdateBusySlots={canEditSchedule ? onUpdateBusySlots : undefined}
               renderSlotCell={renderSlotCell}
             />
           ) : (
@@ -314,20 +322,22 @@ export function ScheduleView({
                 {viewDates.map((date) => {
                   const uploadedCount = new Set(
                     householdUploads
-                      .filter((upload) => upload.date === date)
+                      .filter((upload) => upload.date === date && memberIds.includes(upload.userId))
                       .map((upload) => upload.userId)
                   ).size;
                   return (
                     <div className="week-day-action" key={date}>
-                      <button
-                        type="button"
-                        data-testid={`generate-${date}`}
-                        className={schedules[date] ? 'ghost-button generate-button' : 'primary-button generate-button'}
-                        disabled={busy}
-                        onClick={() => onGenerate(date)}
-                      >
-                        {schedules[date] ? 'Regenerate' : 'Generate slots'}
-                      </button>
+                      {canEditSchedule ? (
+                        <button
+                          type="button"
+                          data-testid={`generate-${date}`}
+                          className={schedules[date] ? 'ghost-button generate-button' : 'primary-button generate-button'}
+                          disabled={busy}
+                          onClick={() => onGenerate(date)}
+                        >
+                          {schedules[date] ? 'Regenerate' : 'Generate slots'}
+                        </button>
+                      ) : null}
                       <button
                         type="button"
                         data-testid={`upload-status-${date}`}
@@ -355,21 +365,32 @@ export function ScheduleView({
                     >
                       {formatSlotTime(timeSlot.start)}
                     </div>
-                    {viewDates.map((date) => {
+                    {viewDates.map((date, dateIndex) => {
                       const slot = schedules[date]?.slots[rowIndex];
                       return (
                         <div
                           className="week-cell"
                           key={`${date}-${timeSlot.start}`}
-                          ref={date === today && rowIndex === 0 ? todayColumnRef : undefined}
+                          ref={
+                            rowIndex === 0
+                              ? dateIndex === 0
+                                ? columnsStartRef
+                                : dateIndex === viewDates.length - 1
+                                  ? columnsEndRef
+                                  : undefined
+                              : undefined
+                          }
                         >
                           {slot ? (
                             renderSlotCell({
                               date,
                               slot,
                               memberIds,
-                              disabled: busy,
+                              disabled: slotEditingDisabled,
                               onClick: () => {
+                                if (!canEditSchedule) {
+                                  return;
+                                }
                                 onActiveDateChange(date);
                                 setEditing({ date, slot });
                               },
@@ -387,7 +408,8 @@ export function ScheduleView({
                 gridRef={gridWrapperRef}
                 slotsStartRef={slotsStartRef}
                 slotsEndRef={slotsEndRef}
-                todayColumnRef={todayColumnRef}
+                columnsStartRef={columnsStartRef}
+                columnsEndRef={columnsEndRef}
               />
             </div>
           )}
@@ -405,9 +427,10 @@ export function ScheduleView({
         uploads={uploads}
         busy={busy}
         open={menuOpen}
+        canEditSchedule={canEditSchedule}
         onClose={() => setMenuOpen(false)}
-        onDeleteUpload={onDeleteUpload}
-        onCleanupOldUploads={onCleanupOldUploads}
+        onDeleteUpload={canEditSchedule ? onDeleteUpload : () => undefined}
+        onCleanupOldUploads={canEditSchedule ? onCleanupOldUploads : () => undefined}
         onSelectUploadDate={(date) => {
           onActiveDateChange(date);
           setMenuOpen(false);
@@ -432,7 +455,7 @@ export function ScheduleView({
             </h2>
             <p className="hero-subtitle">{formatDisplayDate(uploadStatusDate)}</p>
             <div className="upload-status-list">
-              {profile.household?.members.map((member) => {
+              {watchers.map((member) => {
                 const hasUploaded = householdUploads.some(
                   (upload) => upload.date === uploadStatusDate && upload.userId === member.userId
                 );
@@ -459,7 +482,7 @@ export function ScheduleView({
         </div>
       ) : null}
 
-      {editing ? (
+      {editing && canEditSchedule ? (
         <div className="modal-backdrop" role="presentation" onClick={() => setEditing(null)}>
           <div
             className="modal-sheet"
@@ -473,7 +496,7 @@ export function ScheduleView({
               {formatDisplayDate(editing.date)} at {formatSlotTime(editing.slot.start)}
             </p>
             <div className="assignment-options">
-              {profile.household?.members.map((member) => (
+              {watchers.map((member) => (
                 <button
                   key={member.userId}
                   type="button"

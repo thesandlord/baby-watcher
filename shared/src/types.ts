@@ -1,3 +1,5 @@
+export type HouseholdRole = 'watcher' | 'viewer';
+
 export interface BusySlot {
   start: string;
   end: string;

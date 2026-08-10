@@ -3,6 +3,7 @@ import {
   WORKDAY_END,
   WORKDAY_START,
   type DaySchedule,
+  type HouseholdRole,
   type ScheduleSlot,
 } from '@baby-watcher/shared';
 import {
@@ -15,21 +16,36 @@ import {
 } from './timezone';
 
 export { APP_TIMEZONE, formatCalendarDate } from './timezone';
+export type { HouseholdRole } from '@baby-watcher/shared';
 
 export interface HouseholdMember {
   userId: string;
   displayName: string;
+  role: HouseholdRole;
 }
 
 export interface UserProfile {
   uid: string;
   displayName: string;
   email: string | null;
+  role: HouseholdRole;
   household: {
     id: string;
     inviteCode: string | null;
     members: HouseholdMember[];
   } | null;
+}
+
+export function normalizeHouseholdRole(role: unknown): HouseholdRole {
+  return role === 'viewer' ? 'viewer' : 'watcher';
+}
+
+export function householdWatchers(members: HouseholdMember[]): HouseholdMember[] {
+  return members.filter((member) => member.role !== 'viewer');
+}
+
+export function isViewerProfile(profile: UserProfile): boolean {
+  return profile.role === 'viewer';
 }
 
 export function todayIsoDate(): string {
