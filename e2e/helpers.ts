@@ -2,6 +2,7 @@ import { expect, type Page } from '@playwright/test';
 
 export const TEST_DATE = '2026-08-11';
 export const NEXT_DATE = '2026-08-12';
+export const PAST_DATE = '2026-08-07';
 export const PASSWORD = 'password123';
 
 export function uniqueEmail(label: string): string {
@@ -22,13 +23,13 @@ export async function signIn(page: Page, email: string): Promise<void> {
   await page.getByLabel('Email').fill(email);
   await page.getByLabel('Password').fill(PASSWORD);
   await page.getByRole('button', { name: 'Sign in' }).click();
-  await expect(page.getByTestId('week-grid')).toBeVisible();
+  await expect(page.getByTestId('day-board')).toBeVisible();
 }
 
 export async function createHousehold(page: Page, name: string): Promise<string> {
   await page.getByLabel('Your name').fill(name);
   await page.getByRole('button', { name: 'Create household' }).click();
-  await expect(page.getByTestId('week-grid')).toBeVisible();
+  await expect(page.getByTestId('day-board')).toBeVisible();
   await openProfile(page);
   const inviteCode = (await page.getByTestId('invite-code').textContent())?.trim();
   expect(inviteCode).toMatch(/^[A-Z0-9]{6}$/);
@@ -45,7 +46,62 @@ export async function joinHousehold(
   await page.getByLabel('Your name').fill(name);
   await page.getByLabel('Invite code').fill(inviteCode);
   await page.getByRole('button', { name: 'Join household' }).click();
+  await expect(page.getByTestId('day-board')).toBeVisible();
+}
+
+export async function switchToThreeDayView(page: Page): Promise<void> {
+  await page.getByTestId('view-mode-three-day').click();
   await expect(page.getByTestId('week-grid')).toBeVisible();
+}
+
+export async function goToDate(page: Page, date: string): Promise<void> {
+  const dayTab = page.getByTestId(`day-${date}`);
+  if (await dayTab.count() > 0) {
+    await dayTab.click();
+    return;
+  }
+
+  const dayBoard = page.getByTestId('day-board');
+  if (await dayBoard.isVisible()) {
+    const currentDate = await dayBoard.getAttribute('data-date');
+    if (currentDate === date) {
+      return;
+    }
+
+    for (let attempt = 0; attempt < 14; attempt += 1) {
+      const nextDate = await dayBoard.getAttribute('data-date');
+      if (nextDate === date) {
+        return;
+      }
+      if (nextDate && nextDate < date) {
+        await page.getByRole('button', { name: 'Next day' }).click();
+      } else {
+        await page.getByRole('button', { name: 'Previous day' }).click();
+      }
+    }
+
+    throw new Error(`Could not navigate to ${date}`);
+  }
+
+  for (let attempt = 0; attempt < 14; attempt += 1) {
+    if (await page.getByTestId(`day-${date}`).count() > 0) {
+      await page.getByTestId(`day-${date}`).click();
+      return;
+    }
+
+    const visibleDay = page.locator('[data-testid^="day-"]').first();
+    const visibleDate = (await visibleDay.getAttribute('data-testid'))?.replace('day-', '');
+    if (!visibleDate) {
+      break;
+    }
+    if (visibleDate < date) {
+      await page.getByRole('button', { name: 'Next 3 days' }).click();
+    } else {
+      await page.getByRole('button', { name: 'Previous 3 days' }).click();
+    }
+  }
+
+  throw new Error(`Could not navigate to ${date}`);
 }
 
 export async function openProfile(page: Page): Promise<void> {
@@ -68,7 +124,7 @@ export async function expectMembersInProfile(page: Page, names: string[]): Promi
 }
 
 export async function uploadAvailability(page: Page, date = TEST_DATE): Promise<void> {
-  await page.getByTestId(`day-${date}`).click();
+  await goToDate(page, date);
   await page.getByRole('button', { name: 'Upload meetings' }).click();
   const dialog = page.getByRole('dialog', { name: 'Upload calendar screenshot' });
   await expect(dialog).toBeVisible();
@@ -79,6 +135,7 @@ export async function uploadAvailability(page: Page, date = TEST_DATE): Promise<
 }
 
 export async function generateDay(page: Page, date = TEST_DATE): Promise<void> {
+  await goToDate(page, date);
   await page.getByTestId(`generate-${date}`).click();
   await expect(page.getByTestId(`slot-${date}-08:00`)).toBeVisible();
   await waitForAppIdle(page);
@@ -90,6 +147,7 @@ export async function overrideSlot(
   start: string,
   watcherName: string
 ): Promise<void> {
+  await goToDate(page, date);
   await page.getByTestId(`slot-${date}-${start}`).click();
   const dialog = page.getByRole('dialog', { name: 'Override watcher' });
   await expect(dialog).toBeVisible();
@@ -107,6 +165,10 @@ export async function dragSlot(
   source: { date: string; start: string },
   target: { date: string; start: string }
 ): Promise<void> {
+  if (source.date !== target.date) {
+    await switchToThreeDayView(page);
+  }
+  await goToDate(page, source.date);
   const sourceSlot = page.getByTestId(`slot-${source.date}-${source.start}`);
   const targetSlot = page.getByTestId(`slot-${target.date}-${target.start}`);
   const sourceBox = await sourceSlot.boundingBox();

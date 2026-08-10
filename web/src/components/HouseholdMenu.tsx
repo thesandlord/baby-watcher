@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import type { UserProfile } from '../lib/utils';
+import { todayIsoDate, type UserProfile } from '../lib/utils';
 import { memberColor, memberInitials } from '../lib/members';
 import type { UploadedAvailability } from '../lib/firestore-api';
 import { ThemeToggle } from './ThemeToggle';
@@ -11,6 +11,7 @@ interface HouseholdMenuProps {
   open: boolean;
   onClose: () => void;
   onDeleteUpload: (date: string) => void;
+  onCleanupOldUploads: () => void;
   onSelectUploadDate: (date: string) => void;
   onSignOut: () => void;
 }
@@ -22,11 +23,14 @@ export function HouseholdMenu({
   open,
   onClose,
   onDeleteUpload,
+  onCleanupOldUploads,
   onSelectUploadDate,
   onSignOut,
 }: HouseholdMenuProps) {
   const memberIds = profile.household?.members.map((member) => member.userId) ?? [];
   const [copied, setCopied] = useState(false);
+  const today = todayIsoDate();
+  const pastUploadCount = uploads.filter((upload) => upload.date < today).length;
 
   if (!open) {
     return null;
@@ -152,6 +156,17 @@ export function HouseholdMenu({
                 <p className="muted-copy">No extracted schedules uploaded yet.</p>
               ) : null}
             </div>
+            {pastUploadCount > 0 ? (
+              <button
+                type="button"
+                className="secondary-button danger-button"
+                data-testid="cleanup-old-uploads"
+                disabled={busy}
+                onClick={onCleanupOldUploads}
+              >
+                Clean up {pastUploadCount} past schedule{pastUploadCount === 1 ? '' : 's'}
+              </button>
+            ) : null}
           </div>
 
           <ThemeToggle />

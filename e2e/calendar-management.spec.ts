@@ -5,9 +5,11 @@ import {
   closeProfile,
   createHousehold,
   generateDay,
+  goToDate,
   openProfile,
   overrideSlot,
   signUp,
+  switchToThreeDayView,
   uniqueEmail,
   uploadAvailability,
 } from './helpers';
@@ -34,7 +36,7 @@ test('manages days and extracted schedules independently', async ({ page }) => {
   await expect(upload).toBeVisible();
 
   await page.getByTestId(`upload-view-${NEXT_DATE}`).click();
-  await expect(page.getByTestId(`day-${NEXT_DATE}`)).toHaveClass(/active/);
+  await expect(page.getByTestId('day-board')).toHaveAttribute('data-date', NEXT_DATE);
 
   await openProfile(page);
   await page.getByTestId(`upload-${NEXT_DATE}`).locator('summary').click();
@@ -43,5 +45,6 @@ test('manages days and extracted schedules independently', async ({ page }) => {
   await expect(page.getByTestId(`upload-${NEXT_DATE}`)).toHaveCount(0);
   await closeProfile(page);
 
+  await goToDate(page, TEST_DATE);
   await expect(page.getByTestId(`slot-${TEST_DATE}-08:00`)).toContainText('Unassigned');
 });

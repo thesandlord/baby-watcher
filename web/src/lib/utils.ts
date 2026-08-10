@@ -42,6 +42,56 @@ export function mondayOfWeek(date: string): string {
   return isoDate(parsed);
 }
 
+export function shiftDate(date: string, days: number): string {
+  const next = new Date(`${date}T12:00:00`);
+  next.setDate(next.getDate() + days);
+  return isoDate(next);
+}
+
+export function isWeekend(date: string): boolean {
+  const day = new Date(`${date}T12:00:00`).getDay();
+  return day === 0 || day === 6;
+}
+
+export function shiftWeekday(date: string, weekdays: number): string {
+  let current = date;
+  const direction = weekdays >= 0 ? 1 : -1;
+  let remaining = Math.abs(weekdays);
+
+  while (remaining > 0) {
+    current = shiftDate(current, direction);
+    if (!isWeekend(current)) {
+      remaining -= 1;
+    }
+  }
+
+  return current;
+}
+
+export function nextWeekday(date: string): string {
+  return shiftWeekday(date, 1);
+}
+
+export type ScheduleViewMode = 'day' | 'three-day';
+
+export function viewDatesFor(activeDate: string, mode: ScheduleViewMode): string[] {
+  if (mode === 'day') {
+    return [activeDate];
+  }
+
+  const second = nextWeekday(activeDate);
+  const third = nextWeekday(second);
+  return [activeDate, second, third];
+}
+
+export function formatViewHeading(dates: string[]): string {
+  if (dates.length === 1) {
+    return formatDisplayDate(dates[0]);
+  }
+
+  return formatWeekRange(dates);
+}
+
 export function weekdayDates(weekStart: string): string[] {
   const monday = new Date(`${mondayOfWeek(weekStart)}T12:00:00`);
   return Array.from({ length: 5 }, (_, index) => {

@@ -15,7 +15,7 @@ test('creates a household, persists the session, toggles theme, and signs out', 
   await createHousehold(page, 'Owner Alice');
 
   await page.reload();
-  await expect(page.getByTestId('week-grid')).toBeVisible();
+  await expect(page.getByTestId('day-board')).toBeVisible();
   await expectMembersInProfile(page, ['Owner Alice']);
 
   await openProfile(page);

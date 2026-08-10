@@ -11,6 +11,7 @@ import type { DaySchedule } from '@baby-watcher/shared';
 import { auth, googleProvider } from './lib/firebase';
 import {
   deleteMyAvailability,
+  deleteMyAvailabilityBefore,
   getProfile,
   getSchedule,
   regenerateSchedule,
@@ -23,10 +24,10 @@ import {
   type UploadedAvailability,
 } from './lib/firestore-api';
 import {
-  mondayOfWeek,
-  shiftWeek,
+  shiftWeekday,
   todayIsoDate,
-  weekdayDates,
+  viewDatesFor,
+  type ScheduleViewMode,
   type UserProfile,
 } from './lib/utils';
 import { ThemeProvider } from './lib/theme';
@@ -35,24 +36,31 @@ import { OnboardingScreen } from './components/OnboardingScreen';
 import { ScheduleView } from './components/ScheduleView';
 import { UploadMeetingsButton } from './components/UploadMeetingsButton';
 
-function defaultWeekdayDate(): string {
+function defaultActiveDate(): string {
   const today = todayIsoDate();
   const day = new Date(`${today}T12:00:00`).getDay();
-  return day === 0 || day === 6 ? shiftWeek(mondayOfWeek(today), 1) : today;
+  if (day === 0) {
+    return shiftWeekday(today, 1);
+  }
+  if (day === 6) {
+    return shiftWeekday(today, -1);
+  }
+  return today;
 }
 
 function AppContent() {
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<UserProfile | null>(null);
-  const [activeDate, setActiveDate] = useState(defaultWeekdayDate);
-  const [weekStart, setWeekStart] = useState(() => mondayOfWeek(defaultWeekdayDate()));
+  const [activeDate, setActiveDate] = useState(defaultActiveDate);
+  const [viewMode, setViewMode] = useState<ScheduleViewMode>('day');
   const [schedules, setSchedules] = useState<Record<string, DaySchedule | null>>({});
   const [uploads, setUploads] = useState<UploadedAvailability[]>([]);
   const [householdUploads, setHouseholdUploads] = useState<UploadedAvailability[]>([]);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const weekDates = useMemo(() => weekdayDates(weekStart), [weekStart]);
+  const viewDates = useMemo(() => viewDatesFor(activeDate, viewMode), [activeDate, viewMode]);
+  const viewDatesKey = viewDates.join(',');
 
   useEffect(() => {
     return onAuthStateChanged(auth, async (nextUser) => {
@@ -90,13 +98,13 @@ function AppContent() {
 
     const unsubscribeSchedules = subscribeSchedulesForDates(
       householdId,
-      weekDates,
+      viewDates,
       setSchedules,
       handleSubscriptionError
     );
     const unsubscribeHouseholdUploads = subscribeAvailabilityForDates(
       householdId,
-      weekDates,
+      viewDates,
       setHouseholdUploads,
       handleSubscriptionError
     );
@@ -119,7 +127,17 @@ function AppContent() {
       unsubscribeMyUploads();
       unsubscribeMembers();
     };
-  }, [profile?.household?.id, weekStart]);
+  }, [profile?.household?.id, viewDatesKey]);
+
+  useEffect(() => {
+    if (!profile?.household) {
+      return;
+    }
+
+    void deleteMyAvailabilityBefore(profile.household.id, todayIsoDate()).catch((err) => {
+      console.error('Failed to clean up old availability:', err);
+    });
+  }, [profile?.household?.id]);
 
   async function handleGenerate(date: string) {
     if (!profile?.household) {
@@ -200,20 +218,36 @@ function AppContent() {
     }
   }
 
-  function selectDate(date: string) {
-    setActiveDate(date);
-    const monday = mondayOfWeek(date);
-    if (monday !== weekStart) {
-      setWeekStart(monday);
+  async function handleCleanupOldUploads() {
+    if (!profile?.household) {
+      return;
+    }
+    const today = todayIsoDate();
+    const oldCount = uploads.filter((upload) => upload.date < today).length;
+    if (
+      oldCount === 0 ||
+      !window.confirm(`Delete ${oldCount} uploaded schedule${oldCount === 1 ? '' : 's'} from before today?`)
+    ) {
+      return;
+    }
+    setBusy(true);
+    setError(null);
+    try {
+      await deleteMyAvailabilityBefore(profile.household.id, today);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to clean up old schedules.');
+    } finally {
+      setBusy(false);
     }
   }
 
-  function navigateWeek(weeks: number) {
-    setWeekStart((current) => {
-      const next = shiftWeek(current, weeks);
-      setActiveDate(next);
-      return next;
-    });
+  function selectDate(date: string) {
+    setActiveDate(date);
+  }
+
+  function navigatePeriod(direction: -1 | 1) {
+    const step = viewMode === 'day' ? 1 : 3;
+    setActiveDate((current) => shiftWeekday(current, direction * step));
   }
 
   async function refreshProfile() {
@@ -248,8 +282,9 @@ function AppContent() {
       <ScheduleView
         profile={profile}
         schedules={schedules}
-        weekDates={weekDates}
+        viewDates={viewDates}
         activeDate={activeDate}
+        viewMode={viewMode}
         uploads={uploads}
         householdUploads={householdUploads}
         busy={busy}
@@ -258,19 +293,21 @@ function AppContent() {
           <UploadMeetingsButton
             profile={profile}
             selectedDate={activeDate}
-            weekDates={weekDates}
+            viewDates={viewDates}
           />
         )}
         onActiveDateChange={selectDate}
-        onPreviousWeek={() => navigateWeek(-1)}
-        onNextWeek={() => navigateWeek(1)}
-        onToday={() => selectDate(defaultWeekdayDate())}
+        onViewModeChange={setViewMode}
+        onPreviousPeriod={() => navigatePeriod(-1)}
+        onNextPeriod={() => navigatePeriod(1)}
+        onToday={() => selectDate(defaultActiveDate())}
         onGenerate={(date) => void handleGenerate(date)}
         onSwap={(sourceDate, sourceStart, targetDate, targetStart) => {
           void handleSwap(sourceDate, sourceStart, targetDate, targetStart);
         }}
         onAssign={(date, start, watcherId) => void handleAssign(date, start, watcherId)}
         onDeleteUpload={(date) => void handleDeleteUpload(date)}
+        onCleanupOldUploads={() => void handleCleanupOldUploads()}
         onSignOut={() => void signOut(auth)}
       />
     </div>
