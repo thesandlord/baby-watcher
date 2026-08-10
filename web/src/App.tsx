@@ -21,6 +21,7 @@ import {
   subscribeSchedulesForDates,
   swapScheduleAssignments,
   updateScheduleAssignment,
+  updateAvailabilityBusySlots,
   type UploadedAvailability,
 } from './lib/firestore-api';
 import {
@@ -30,6 +31,7 @@ import {
   type ScheduleViewMode,
   type UserProfile,
 } from './lib/utils';
+import { weekdayIndexInAppTimezone } from './lib/timezone';
 import { ThemeProvider } from './lib/theme';
 import { LoginScreen } from './components/LoginScreen';
 import { OnboardingScreen } from './components/OnboardingScreen';
@@ -38,7 +40,7 @@ import { UploadMeetingsButton } from './components/UploadMeetingsButton';
 
 function defaultActiveDate(): string {
   const today = todayIsoDate();
-  const day = new Date(`${today}T12:00:00`).getDay();
+  const day = weekdayIndexInAppTimezone(today);
   if (day === 0) {
     return shiftWeekday(today, 1);
   }
@@ -203,6 +205,21 @@ function AppContent() {
     }
   }
 
+  async function handleUpdateBusySlots(date: string, busySlots: UploadedAvailability['busySlots']) {
+    if (!profile?.household) {
+      return;
+    }
+    setBusy(true);
+    setError(null);
+    try {
+      await updateAvailabilityBusySlots(profile.household.id, date, busySlots);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to update meeting times.');
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function handleDeleteUpload(date: string) {
     if (!profile?.household || !window.confirm(`Delete your extracted schedule for ${date}?`)) {
       return;
@@ -306,6 +323,7 @@ function AppContent() {
           void handleSwap(sourceDate, sourceStart, targetDate, targetStart);
         }}
         onAssign={(date, start, watcherId) => void handleAssign(date, start, watcherId)}
+        onUpdateBusySlots={(date, busySlots) => void handleUpdateBusySlots(date, busySlots)}
         onDeleteUpload={(date) => void handleDeleteUpload(date)}
         onCleanupOldUploads={() => void handleCleanupOldUploads()}
         onSignOut={() => void signOut(auth)}

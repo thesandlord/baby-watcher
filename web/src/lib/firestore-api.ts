@@ -236,6 +236,28 @@ export async function saveAvailabilityBatch(
   await batch.commit();
 }
 
+export async function updateAvailabilityBusySlots(
+  householdId: string,
+  date: string,
+  busySlots: PersonAvailability['busySlots']
+) {
+  const uid = requireUserId();
+  const availabilityRef = doc(db, 'households', householdId, 'availability', `${date}_${uid}`);
+  const availabilityDoc = await getDoc(availabilityRef);
+  if (!availabilityDoc.exists()) {
+    throw new Error('No availability uploaded for this day.');
+  }
+
+  await setDoc(
+    availabilityRef,
+    {
+      busySlots,
+      updatedAt: serverTimestamp(),
+    },
+    { merge: true }
+  );
+}
+
 export async function listMyAvailability(
   householdId: string
 ): Promise<UploadedAvailability[]> {

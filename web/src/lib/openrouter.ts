@@ -3,6 +3,7 @@ import type {
   BusySlot,
   DayAvailabilityExtraction,
 } from '@baby-watcher/shared';
+import { APP_TIMEZONE, parseWallClockTime, todayIsoDateInAppTimezone } from './timezone';
 
 const OPENROUTER_API_URL = 'https://openrouter.ai/api/v1/chat/completions';
 
@@ -42,12 +43,14 @@ For a WEEK view (multiple days visible in one screenshot), use this shape:
 }
 
 Rules:
-- Use 24-hour time in HH:mm format.
+- All times are Pacific Time (America/Los_Angeles, PST/PDT). Read times exactly as shown on the calendar.
+- Use 24-hour time in HH:mm format (e.g. "09:00", "13:30").
 - Include meetings, appointments, and blocked time as busy slots.
 - Ignore all-day events unless they explicitly block daytime availability.
 - For week views, extract busy slots separately for each visible weekday (Mon–Fri when possible).
 - If the calendar day or week is unclear, set date/weekStart to null and needsDateConfirmation to true.
-- Only include events that overlap 08:00-17:00 local time when possible.
+- Only include events that overlap 08:00-17:00 Pacific Time when possible.
+- Align each event's start and end to the time grid lines shown in the screenshot — do not round to the nearest half hour.
 - If no busy slots are visible for a day, include that day with an empty busySlots array.
 - Prefer isWeekView true when the screenshot clearly shows multiple days at once.`;
 
@@ -76,7 +79,9 @@ export async function extractCalendarFromImage(
     throw new Error('VITE_OPENROUTER_API_KEY is not configured');
   }
 
-  const hints: string[] = [];
+  const hints: string[] = [
+    `All extracted times must be Pacific Time (${APP_TIMEZONE}).`,
+  ];
   if (options?.hintedDate) {
     hints.push(`The user indicated this calendar is for ${options.hintedDate}.`);
   }
@@ -160,10 +165,9 @@ function mockCalendarExtraction(options?: {
     };
   }
 
-  const today = new Date();
+  const today = todayIsoDateInAppTimezone();
   const date =
-    options?.hintedDate ??
-    `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+    options?.hintedDate ?? today;
 
   return {
     isWeekView: false,
@@ -236,12 +240,20 @@ function extractJson(raw: string): string {
 }
 
 function normalizeBusySlots(slots: BusySlot[]): BusySlot[] {
-  return slots
-    .filter((slot) => slot.start && slot.end)
-    .map((slot) => ({
-      start: slot.start.slice(0, 5),
-      end: slot.end.slice(0, 5),
+  const normalized: BusySlot[] = [];
+
+  for (const slot of slots) {
+    const start = parseWallClockTime(slot.start);
+    const end = parseWallClockTime(slot.end);
+    if (!start || !end || start >= end) {
+      continue;
+    }
+    normalized.push({
+      start,
+      end,
       title: slot.title,
-    }))
-    .sort((a, b) => a.start.localeCompare(b.start) || a.end.localeCompare(b.end));
+    });
+  }
+
+  return normalized.sort((a, b) => a.start.localeCompare(b.start) || a.end.localeCompare(b.end));
 }

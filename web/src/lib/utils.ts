@@ -1,4 +1,15 @@
 import type { DaySchedule } from '@baby-watcher/shared';
+import {
+  APP_TIMEZONE,
+  formatCalendarDate,
+  formatWallClockTime,
+  nowMinutesInAppTimezone,
+  shiftCalendarDate,
+  todayIsoDateInAppTimezone,
+  weekdayIndexInAppTimezone,
+} from './timezone';
+
+export { APP_TIMEZONE, formatCalendarDate } from './timezone';
 
 export interface HouseholdMember {
   userId: string;
@@ -21,35 +32,21 @@ export function todayIsoDate(): string {
   if (fixedToday) {
     return fixedToday;
   }
-  const now = new Date();
-  const year = now.getFullYear();
-  const month = String(now.getMonth() + 1).padStart(2, '0');
-  const day = String(now.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
-}
-
-export function isoDate(date: Date): string {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const day = String(date.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
+  return todayIsoDateInAppTimezone();
 }
 
 export function mondayOfWeek(date: string): string {
-  const parsed = new Date(`${date}T12:00:00`);
-  const day = parsed.getDay();
-  parsed.setDate(parsed.getDate() - (day === 0 ? 6 : day - 1));
-  return isoDate(parsed);
+  const day = weekdayIndexInAppTimezone(date);
+  const daysFromMonday = day === 0 ? 6 : day - 1;
+  return shiftCalendarDate(date, -daysFromMonday);
 }
 
 export function shiftDate(date: string, days: number): string {
-  const next = new Date(`${date}T12:00:00`);
-  next.setDate(next.getDate() + days);
-  return isoDate(next);
+  return shiftCalendarDate(date, days);
 }
 
 export function isWeekend(date: string): boolean {
-  const day = new Date(`${date}T12:00:00`).getDay();
+  const day = weekdayIndexInAppTimezone(date);
   return day === 0 || day === 6;
 }
 
@@ -86,45 +83,39 @@ export function viewDatesFor(activeDate: string, mode: ScheduleViewMode): string
 
 export function formatViewHeading(dates: string[]): string {
   if (dates.length === 1) {
-    return formatDisplayDate(dates[0]);
+    return '';
   }
 
   return formatWeekRange(dates);
 }
 
+export function formatShortDate(date: string): string {
+  return formatCalendarDate(date, { weekday: 'short', month: 'short', day: 'numeric' });
+}
+
 export function weekdayDates(weekStart: string): string[] {
-  const monday = new Date(`${mondayOfWeek(weekStart)}T12:00:00`);
-  return Array.from({ length: 5 }, (_, index) => {
-    const date = new Date(monday);
-    date.setDate(monday.getDate() + index);
-    return isoDate(date);
-  });
+  const monday = mondayOfWeek(weekStart);
+  return Array.from({ length: 5 }, (_, index) => shiftCalendarDate(monday, index));
 }
 
 export function shiftWeek(weekStart: string, weeks: number): string {
-  const date = new Date(`${mondayOfWeek(weekStart)}T12:00:00`);
-  date.setDate(date.getDate() + weeks * 7);
-  return isoDate(date);
+  return shiftCalendarDate(mondayOfWeek(weekStart), weeks * 7);
 }
 
 export function formatWeekRange(dates: string[]): string {
   if (dates.length === 0) {
     return '';
   }
-  const start = new Date(`${dates[0]}T12:00:00`);
-  const finish = new Date(`${dates.at(-1)}T12:00:00`);
-  finish.setDate(finish.getDate() + 1);
-  const startLabel = start.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
-  const finishLabel = finish.toLocaleDateString(undefined, {
-    month: start.getMonth() === finish.getMonth() ? undefined : 'short',
+  const startLabel = formatCalendarDate(dates[0], { month: 'short', day: 'numeric' });
+  const finishLabel = formatCalendarDate(dates.at(-1)!, {
+    month: dates[0].slice(0, 7) === dates.at(-1)!.slice(0, 7) ? undefined : 'short',
     day: 'numeric',
   });
   return `${startLabel}-${finishLabel}`;
 }
 
 export function formatDisplayDate(date: string): string {
-  const parsed = new Date(`${date}T12:00:00`);
-  return parsed.toLocaleDateString(undefined, {
+  return formatCalendarDate(date, {
     weekday: 'long',
     month: 'short',
     day: 'numeric',
@@ -132,13 +123,7 @@ export function formatDisplayDate(date: string): string {
 }
 
 export function formatSlotTime(time: string): string {
-  const [hours, minutes] = time.split(':').map(Number);
-  const date = new Date();
-  date.setHours(hours, minutes, 0, 0);
-  return date.toLocaleTimeString(undefined, {
-    hour: 'numeric',
-    minute: '2-digit',
-  });
+  return formatWallClockTime(time);
 }
 
 /** Returns 0–1 position through the workday, or null if outside the range. */
@@ -153,7 +138,7 @@ export function currentTimeLineFraction(
   };
   const startMinutes = toMinutes(start);
   const endMinutes = toMinutes(end);
-  const nowMinutes = now.getHours() * 60 + now.getMinutes() + now.getSeconds() / 60;
+  const nowMinutes = nowMinutesInAppTimezone(now);
 
   if (nowMinutes < startMinutes || nowMinutes > endMinutes) {
     return null;
