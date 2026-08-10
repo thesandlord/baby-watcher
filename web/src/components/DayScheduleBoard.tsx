@@ -9,6 +9,7 @@ import {
   type ScheduleSlot,
 } from '@baby-watcher/shared';
 import { memberColor, memberInitials } from '../lib/members';
+import { useSlotActivation } from '../lib/useSlotActivation';
 import { parseWallClockTime } from '../lib/timezone';
 import {
   formatDisplayDate,
@@ -147,28 +148,7 @@ function shiftBusySlot(
   };
 }
 
-function resizeBusySlot(
-  busySlot: BusySlot,
-  edge: 'start' | 'end',
-  deltaMinutes: number,
-  metrics: ReturnType<typeof workdayMetrics>
-): BusySlot {
-  const startMinutes = timeToMinutes(busySlot.start);
-  const endMinutes = timeToMinutes(busySlot.end);
-  const snappedDelta = snapMinutes(deltaMinutes);
-
-  if (edge === 'start') {
-    let nextStart = snapMinutes(startMinutes + snappedDelta);
-    nextStart = Math.max(metrics.startMinutes, Math.min(nextStart, endMinutes - MIN_MEETING_MINUTES));
-    return { ...busySlot, start: minutesToTime(nextStart) };
-  }
-
-  let nextEnd = snapMinutes(endMinutes + snappedDelta);
-  nextEnd = Math.min(metrics.endMinutes, Math.max(nextEnd, startMinutes + MIN_MEETING_MINUTES));
-  return { ...busySlot, end: minutesToTime(nextEnd) };
-}
-
-type InteractionMode = 'idle' | 'drag' | 'resize-start' | 'resize-end';
+type InteractionMode = 'idle' | 'drag';
 
 interface MeetingBlockProps {
   busySlot: BusySlot;
@@ -201,33 +181,16 @@ function MeetingBlock({
   const [interacting, setInteracting] = useState(false);
   const startClientYRef = useRef(0);
   const modeRef = useRef<InteractionMode>('idle');
-  const movedRef = useRef(false);
   const blockRef = useRef<HTMLDivElement>(null);
+  const activation = useSlotActivation(onEdit, !editable || disabled);
 
-  function finishInteraction(deltaY: number) {
-    if (!editable || disabled || trackHeight <= 0) {
-      return;
-    }
-
-    const mode = modeRef.current;
-    if (mode === 'idle' || deltaY === 0) {
+  function finishDrag(deltaY: number) {
+    if (!editable || disabled || trackHeight <= 0 || deltaY === 0) {
       return;
     }
 
     const deltaMinutes = (deltaY / trackHeight) * metrics.totalMinutes;
-
-    if (mode === 'drag') {
-      const nextSlot = shiftBusySlot(busySlot, deltaMinutes, metrics);
-      if (nextSlot.start === busySlot.start && nextSlot.end === busySlot.end) {
-        return;
-      }
-      const nextBusySlots = busySlots.map((slot, index) => (index === slotIndex ? nextSlot : slot));
-      onUpdateBusySlots(nextBusySlots);
-      return;
-    }
-
-    const edge = mode === 'resize-start' ? 'start' : 'end';
-    const nextSlot = resizeBusySlot(busySlot, edge, deltaMinutes, metrics);
+    const nextSlot = shiftBusySlot(busySlot, deltaMinutes, metrics);
     if (nextSlot.start === busySlot.start && nextSlot.end === busySlot.end) {
       return;
     }
@@ -237,35 +200,17 @@ function MeetingBlock({
 
   function resetInteraction() {
     modeRef.current = 'idle';
-    movedRef.current = false;
     setInteracting(false);
     setDragOffsetY(0);
-  }
-
-  function resolveMode(target: EventTarget | null): InteractionMode {
-    if (!(target instanceof Element)) {
-      return 'drag';
-    }
-    if (target.closest('.day-meeting-resize-start')) {
-      return 'resize-start';
-    }
-    if (target.closest('.day-meeting-resize-end')) {
-      return 'resize-end';
-    }
-    return 'drag';
   }
 
   function beginInteraction(event: React.PointerEvent) {
     if (!editable || disabled) {
       return;
     }
-    const mode = resolveMode(event.target);
     blockRef.current?.setPointerCapture(event.pointerId);
     startClientYRef.current = event.clientY;
-    modeRef.current = mode;
-    movedRef.current = false;
-    setInteracting(true);
-    setDragOffsetY(0);
+    modeRef.current = 'idle';
   }
 
   const blockStyle = meetingBlockStyle(busySlot, metrics);
@@ -274,12 +219,11 @@ function MeetingBlock({
   }
 
   const isDragging = modeRef.current === 'drag' && interacting;
-  const isResizing = interacting && modeRef.current.startsWith('resize');
 
   return (
     <div
       ref={blockRef}
-      className={`day-meeting-block${editable ? ' editable' : ''}${isDragging ? ' dragging' : ''}${isResizing ? ' resizing' : ''}`}
+      className={`day-meeting-block${editable ? ' editable' : ''}${isDragging ? ' dragging' : ''}`}
       data-testid={`meeting-${memberUserId}-${busySlot.start}`}
       style={{
         ...blockStyle,
@@ -291,20 +235,27 @@ function MeetingBlock({
           ? `${busySlot.start}–${busySlot.end} · ${busySlot.title}`
           : `${busySlot.start}–${busySlot.end}`
       }
+      onDoubleClick={activation.onDoubleClick}
+      onClick={activation.onClick}
       onPointerDown={
         editable && !disabled
-          ? beginInteraction
+          ? (event) => {
+              beginInteraction(event);
+              activation.onPointerDown(event);
+            }
           : undefined
       }
       onPointerMove={
         editable && !disabled
           ? (event) => {
-              if (modeRef.current === 'idle') {
-                return;
-              }
+              activation.onPointerMove(event);
               const deltaY = event.clientY - startClientYRef.current;
-              if (Math.abs(deltaY) > DRAG_THRESHOLD_PX) {
-                movedRef.current = true;
+              if (modeRef.current === 'idle') {
+                if (Math.abs(deltaY) > DRAG_THRESHOLD_PX) {
+                  modeRef.current = 'drag';
+                  setInteracting(true);
+                }
+                return;
               }
               if (modeRef.current === 'drag') {
                 setDragOffsetY(deltaY);
@@ -315,44 +266,29 @@ function MeetingBlock({
       onPointerUp={
         editable && !disabled
           ? (event) => {
-              if (modeRef.current === 'idle') {
-                return;
+              activation.onPointerUp();
+              if (modeRef.current === 'drag') {
+                const deltaY = event.clientY - startClientYRef.current;
+                finishDrag(deltaY);
               }
-              const deltaY = event.clientY - startClientYRef.current;
-              const mode = modeRef.current;
-              const didMove = movedRef.current;
               resetInteraction();
-              if (!didMove && mode === 'drag') {
-                onEdit();
-                return;
-              }
-              finishInteraction(deltaY);
             }
           : undefined
       }
       onPointerCancel={
         editable && !disabled
-          ? () => resetInteraction()
+          ? () => {
+              activation.onPointerCancel();
+              resetInteraction();
+            }
           : undefined
       }
     >
-      {editable ? (
-        <div
-          className="day-meeting-resize-handle day-meeting-resize-start"
-          aria-hidden="true"
-        />
-      ) : null}
       <span className="day-meeting-time">
         {formatSlotTime(busySlot.start)}–{formatSlotTime(busySlot.end)}
       </span>
       {busySlot.title ? (
         <span className="day-meeting-title">{busySlot.title}</span>
-      ) : null}
-      {editable ? (
-        <div
-          className="day-meeting-resize-handle day-meeting-resize-end"
-          aria-hidden="true"
-        />
       ) : null}
     </div>
   );
