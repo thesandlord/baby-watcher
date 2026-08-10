@@ -2,14 +2,8 @@ import type { CalendarExtractionResult, BusySlot } from '@baby-watcher/shared';
 
 const OPENROUTER_API_URL = 'https://openrouter.ai/api/v1/chat/completions';
 
-/** Free vision models for calendar extraction, tried in order via OpenRouter fallbacks. */
-const FREE_VISION_MODELS = [
-  'google/gemma-4-26b-a4b-it:free',
-  'nvidia/nemotron-nano-12b-v2-vl:free',
-  'nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free',
-  'google/gemma-4-31b-it:free',
-  'openrouter/free',
-];
+/** OpenRouter free router: picks an available free model that supports the request (including vision). */
+const FREE_VISION_MODEL = 'openrouter/free';
 
 const EXTRACTION_PROMPT = `You extract calendar availability from a screenshot for baby-watching schedule planning.
 
@@ -79,7 +73,7 @@ export async function extractCalendarFromImage(
       'X-Title': 'Baby Watcher',
     },
     body: JSON.stringify({
-      models: FREE_VISION_MODELS,
+      model: FREE_VISION_MODEL,
       messages,
       temperature: 0,
       response_format: { type: 'json_object' },

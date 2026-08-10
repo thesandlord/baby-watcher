@@ -56,7 +56,7 @@ Also create a **`production` environment** in GitHub (Settings → Environments)
 | `VITE_FIREBASE_APP_ID` | Firebase web app ID |
 | `VITE_OPENROUTER_API_KEY` | OpenRouter API key for calendar extraction |
 
-Note: `VITE_FIREBASE_PROJECT_ID` is set automatically from `FIREBASE_PROJECT_ID` in the workflow. Vision models are hardcoded in the app (free OpenRouter fallbacks).
+Note: `VITE_FIREBASE_PROJECT_ID` is set automatically from `FIREBASE_PROJECT_ID` in the workflow. Calendar extraction uses OpenRouter's hardcoded `openrouter/free` router.
 
 ## Manual deploy trigger
 
