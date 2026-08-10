@@ -586,7 +586,7 @@ button {
   position: sticky;
   left: 0;
   z-index: 2;
-  min-height: 1.5rem;
+  min-height: 3rem;
   padding: 0.35rem 0.5rem 0;
   background: var(--surface-strong);
   color: var(--text-muted);
@@ -597,7 +597,7 @@ button {
 }
 
 .week-cell {
-  min-height: 1.5rem;
+  min-height: 3rem;
   padding: 0.18rem;
   border-left: 1px solid var(--border);
   border-bottom: 1px solid var(--border);
@@ -611,7 +611,7 @@ button {
   justify-content: space-between;
   width: 100%;
   height: 100%;
-  min-height: 1.3rem;
+  min-height: 2.62rem;
   overflow: hidden;
   border: 1px solid color-mix(in srgb, var(--slot-accent) 45%, transparent);
   border-left: 4px solid var(--slot-accent);
@@ -774,6 +774,7 @@ button {
   display: grid;
   grid-template-rows: auto auto 1fr;
   min-width: min(100%, 960px);
+  --slot-height: 3rem;
 }
 
 .day-board-header,
@@ -901,7 +902,10 @@ button {
 }
 
 .day-time-label {
-  min-height: 1.5rem;
+  box-sizing: border-box;
+  height: var(--slot-height);
+  min-height: var(--slot-height);
+  max-height: var(--slot-height);
   padding: 0.35rem 0.5rem 0;
   color: var(--text-muted);
   border-bottom: 1px solid var(--border);
@@ -913,11 +917,15 @@ button {
 .day-meetings-column {
   border-left: 1px solid var(--border);
   border-bottom: 1px solid var(--border);
+  align-self: start;
 }
 
 .day-meetings-track {
   position: relative;
-  height: 100%;
+  box-sizing: border-box;
+  height: calc(var(--slot-count) * var(--slot-height));
+  min-height: calc(var(--slot-count) * var(--slot-height));
+  max-height: calc(var(--slot-count) * var(--slot-height));
 }
 
 .day-meetings-track.addable {
@@ -1008,9 +1016,13 @@ button {
 }
 
 .day-watch-cell {
-  min-height: 1.5rem;
+  box-sizing: border-box;
+  height: var(--slot-height);
+  min-height: var(--slot-height);
+  max-height: var(--slot-height);
   padding: 0.18rem;
   border-bottom: 1px solid var(--border);
+  overflow: hidden;
 }
 
 .assignment-options {

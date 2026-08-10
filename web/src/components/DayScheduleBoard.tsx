@@ -2,6 +2,7 @@ import { useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode, 
 import {
   WORKDAY_END,
   WORKDAY_START,
+  MEETING_GRID_MINUTES,
   SLOT_MINUTES,
   type BusySlot,
   type DaySchedule,
@@ -17,11 +18,11 @@ import {
 } from '../lib/utils';
 import type { UploadedAvailability } from '../lib/firestore-api';
 
-const SLOT_HEIGHT_REM = 1.5;
+const SLOT_HEIGHT_REM = 3;
 const DRAG_THRESHOLD_PX = 6;
-const MIN_MEETING_MINUTES = SLOT_MINUTES;
+const MIN_MEETING_MINUTES = MEETING_GRID_MINUTES;
 
-const DEFAULT_MEETING_MINUTES = SLOT_MINUTES * 2;
+const DEFAULT_MEETING_MINUTES = SLOT_MINUTES;
 
 interface DayScheduleBoardProps {
   date: string;
@@ -114,7 +115,7 @@ function minutesToTime(totalMinutes: number): string {
   return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
 }
 
-function snapMinutes(minutes: number, grid = SLOT_MINUTES): number {
+function snapMinutes(minutes: number, grid = MEETING_GRID_MINUTES): number {
   return Math.round(minutes / grid) * grid;
 }
 
@@ -562,31 +563,35 @@ export function DayScheduleBoard({
   const boardRef = useRef<HTMLDivElement>(null);
   const slotsStartRef = useRef<HTMLDivElement>(null);
   const slotsEndRef = useRef<HTMLDivElement>(null);
-  const trackRef = useRef<HTMLDivElement>(null);
+  const meetingsTrackRef = useRef<HTMLDivElement>(null);
   const [trackHeight, setTrackHeight] = useState(0);
   const [meetingForm, setMeetingForm] = useState<MeetingFormState | null>(null);
   const [editStart, setEditStart] = useState('');
   const [editEnd, setEditEnd] = useState('');
   const [editTitle, setEditTitle] = useState('');
   const [editError, setEditError] = useState<string | null>(null);
-  const boardHeight = `${timeSlots.length * SLOT_HEIGHT_REM}rem`;
   const canEditMeetings = Boolean(onUpdateBusySlots);
+  const boardStyle = {
+    '--member-count': members.length,
+    '--slot-height': `${SLOT_HEIGHT_REM}rem`,
+    '--slot-count': timeSlots.length,
+  } as CSSProperties;
 
   useLayoutEffect(() => {
-    const track = trackRef.current;
+    const track = meetingsTrackRef.current;
     if (!track) {
       return;
     }
 
     function measure() {
-      setTrackHeight(trackRef.current?.clientHeight ?? 0);
+      setTrackHeight(meetingsTrackRef.current?.clientHeight ?? 0);
     }
 
     measure();
     const observer = new ResizeObserver(measure);
     observer.observe(track);
     return () => observer.disconnect();
-  }, [boardHeight, timeSlots.length]);
+  }, [timeSlots.length]);
 
   function openMeetingEditor(
     memberUserId: string,
@@ -714,7 +719,7 @@ export function DayScheduleBoard({
         className="day-board"
         data-testid="day-board"
         data-date={date}
-        style={{ '--member-count': members.length } as CSSProperties}
+        style={boardStyle}
       >
         <div className="day-board-header">
           <div className="day-corner" />
@@ -781,7 +786,7 @@ export function DayScheduleBoard({
           ))}
         </div>
 
-        <div className="day-board-body" ref={trackRef} style={{ minHeight: boardHeight }}>
+        <div className="day-board-body">
           <div className="day-time-column">
             {timeSlots.map((timeSlot, rowIndex) => (
               <div
@@ -821,15 +826,15 @@ export function DayScheduleBoard({
 
           <div className="day-watch-divider day-watch-divider-body" aria-hidden="true" />
 
-          {members.map((member) => {
+          {members.map((member, memberIndex) => {
             const busySlots = getMemberBusySlots(member.userId, date, householdUploads);
             const accent = memberColor(member.userId, memberIds);
 
             return (
               <div className="day-meetings-column" key={member.userId}>
                 <div
+                  ref={memberIndex === 0 ? meetingsTrackRef : undefined}
                   className={`day-meetings-track${canEditMeetings ? ' addable' : ''}`}
-                  style={{ minHeight: boardHeight }}
                   onClick={
                     canEditMeetings
                       ? (event) => handleTrackClick(event, member.userId, member.displayName)
@@ -869,7 +874,7 @@ export function DayScheduleBoard({
         boardRef={boardRef}
         slotsStartRef={slotsStartRef}
         slotsEndRef={slotsEndRef}
-        trackRef={trackRef}
+        trackRef={meetingsTrackRef}
       />
 
       {meetingForm ? (

@@ -2,7 +2,8 @@ import type { BusySlot, PersonAvailability, ScheduleSlot } from './types.js';
 
 export const WORKDAY_START = '08:00';
 export const WORKDAY_END = '17:00';
-export const SLOT_MINUTES = 15;
+export const SLOT_MINUTES = 30;
+export const MEETING_GRID_MINUTES = 15;
 
 export function generateTimeSlots(
   start: string,
@@ -83,7 +84,7 @@ function stableStringify(value: unknown): string {
 
 /**
  * Deterministic baby-watching schedule generator.
- * Assigns each 15-minute slot to the available watcher with the fewest
+ * Assigns each 30-minute slot to the available watcher with the fewest
  * prior assignments; ties break on userId lexicographic order.
  */
 export function generateSchedule(

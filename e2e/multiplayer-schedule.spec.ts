@@ -79,7 +79,7 @@ test('two players share generation, overrides, swaps, uploads, and regeneration'
     await completeUploadStatus.getByRole('button', { name: 'Close' }).click();
 
     await generateDay(alice);
-    await expect(alice.locator(`[data-testid^="slot-${TEST_DATE}-"]`)).toHaveCount(36);
+    await expect(alice.locator(`[data-testid^="slot-${TEST_DATE}-"]`)).toHaveCount(18);
     await expect(alice.getByTestId(`slot-${TEST_DATE}-09:00`)).toContainText('Unassigned');
 
     await bob.reload();
