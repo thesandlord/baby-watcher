@@ -82,11 +82,7 @@ export function viewDatesFor(activeDate: string, mode: ScheduleViewMode): string
 }
 
 export function formatViewHeading(dates: string[]): string {
-  if (dates.length === 1) {
-    return '';
-  }
-
-  return formatWeekRange(dates);
+  return ''
 }
 
 export function formatShortDate(date: string): string {
