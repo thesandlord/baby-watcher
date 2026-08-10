@@ -835,7 +835,7 @@ button {
 
 .day-board {
   display: grid;
-  grid-template-rows: auto auto 1fr;
+  grid-template-columns: 4.8rem minmax(160px, 1.15fr) 4px repeat(var(--member-count, 1), minmax(120px, 1fr));
   min-width: min(100%, 960px);
   --slot-height: 3rem;
   --day-head-height: 4rem;
@@ -843,46 +843,46 @@ button {
 
 .day-board-header,
 .day-board-actions,
-.day-board-body {
-  display: grid;
-  grid-template-columns: 4.8rem minmax(160px, 1.15fr) 4px repeat(var(--member-count, 1), minmax(120px, 1fr));
+.day-board-slot-row {
+  display: contents;
 }
 
-.day-board-header > .day-corner,
-.day-board-header > .day-watch-header,
-.day-board-header > .day-watch-divider,
-.day-board-header > .day-member-header {
+.day-corner,
+.day-watch-header,
+.day-watch-divider,
+.day-member-header,
+.day-actions-label,
+.day-watch-actions,
+.day-member-action {
+  background: var(--surface-strong);
+}
+
+.day-corner,
+.day-watch-header,
+.day-watch-divider,
+.day-member-header {
   position: sticky;
   top: 0;
   z-index: 4;
 }
 
-.day-board-header > .day-corner {
+.day-corner {
   left: 0;
   z-index: 6;
 }
 
-.day-board-actions > .day-actions-label,
-.day-board-actions > .day-watch-actions,
-.day-board-actions > .day-watch-divider,
-.day-board-actions > .day-member-action {
+.day-actions-label,
+.day-watch-actions,
+.day-board-actions .day-watch-divider,
+.day-member-action {
   position: sticky;
   top: var(--day-head-height);
   z-index: 4;
 }
 
-.day-board-actions > .day-actions-label {
+.day-actions-label {
   left: 0;
   z-index: 5;
-}
-
-.day-corner,
-.day-actions-label,
-.day-time-column {
-  position: sticky;
-  left: 0;
-  z-index: 3;
-  background: var(--surface-strong);
 }
 
 .day-corner,
@@ -930,7 +930,8 @@ button {
 }
 
 .day-watch-divider-body {
-  min-height: 100%;
+  height: var(--slot-height);
+  border-bottom: 1px solid var(--border);
 }
 
 .day-board-actions {
@@ -939,10 +940,8 @@ button {
 
 .day-actions-label,
 .day-member-action,
-.day-member-action-spacer,
 .day-watch-actions {
   min-height: 4rem;
-  background: var(--surface-strong);
 }
 
 .day-member-action {
@@ -979,22 +978,19 @@ button {
   padding: 0.55rem;
 }
 
-.day-board-body {
-  align-items: stretch;
-}
-
-.day-time-column {
-  border-right: 1px solid var(--border);
-}
-
 .day-time-label {
+  position: sticky;
+  left: 0;
+  z-index: 2;
   box-sizing: border-box;
   height: var(--slot-height);
   min-height: var(--slot-height);
   max-height: var(--slot-height);
   padding: 0.35rem 0.5rem 0;
   color: var(--text-muted);
+  border-right: 1px solid var(--border);
   border-bottom: 1px solid var(--border);
+  background: var(--surface-strong);
   font-size: 0.72rem;
   text-align: right;
   font-variant-numeric: tabular-nums;
@@ -1097,16 +1093,13 @@ button {
   white-space: nowrap;
 }
 
-.day-watch-column {
-  border-left: 1px solid var(--border);
-}
-
 .day-watch-cell {
   box-sizing: border-box;
   height: var(--slot-height);
   min-height: var(--slot-height);
   max-height: var(--slot-height);
   padding: 0.18rem;
+  border-left: 1px solid var(--border);
   border-bottom: 1px solid var(--border);
   overflow: hidden;
 }
