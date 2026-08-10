@@ -1,6 +1,6 @@
 # Baby Watcher
 
-Coordinate baby-watching coverage during the work day by uploading calendar screenshots and generating a fair, deterministic 8am–5pm schedule in 15-minute slots.
+Coordinate baby-watching coverage during the work day by uploading calendar screenshots and generating a fair, deterministic 8am–5pm schedule in 30-minute watch slots. Meeting times support 15-minute precision.
 
 Everything runs client-side: Firebase Auth + Firestore for data, OpenRouter for calendar extraction, and a shared deterministic scheduler in the browser.
 
@@ -88,7 +88,7 @@ firebase deploy --only firestore,hosting --project YOUR_PROJECT_ID
 
 ## How scheduling works
 
-For each 15-minute slot from 08:00 to 17:00, the scheduler assigns the available household member with the fewest prior assignments. Ties break deterministically on `userId`. The same inputs always produce the same schedule.
+For each 30-minute watch slot from 08:00 to 17:00, the scheduler assigns the available household member with the fewest prior assignments. Ties break deterministically on `userId`. The same inputs always produce the same schedule.
 
 ## Firestore model
 

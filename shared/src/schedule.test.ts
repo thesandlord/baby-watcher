@@ -8,11 +8,11 @@ import {
 import type { PersonAvailability } from './types.js';
 
 describe('generateTimeSlots', () => {
-  it('creates 15-minute slots from 8am to 5pm', () => {
-    const slots = generateTimeSlots('08:00', '17:00', 15);
-    expect(slots).toHaveLength(36);
-    expect(slots[0]).toEqual({ start: '08:00', end: '08:15' });
-    expect(slots.at(-1)).toEqual({ start: '16:45', end: '17:00' });
+  it('creates 30-minute slots from 8am to 5pm', () => {
+    const slots = generateTimeSlots('08:00', '17:00', 30);
+    expect(slots).toHaveLength(18);
+    expect(slots[0]).toEqual({ start: '08:00', end: '08:30' });
+    expect(slots.at(-1)).toEqual({ start: '16:30', end: '17:00' });
   });
 });
 
