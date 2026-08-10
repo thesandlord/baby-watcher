@@ -236,26 +236,36 @@ export async function saveAvailabilityBatch(
   await batch.commit();
 }
 
-export async function updateAvailabilityBusySlots(
+export async function upsertMemberAvailabilityBusySlots(
   householdId: string,
   date: string,
+  userId: string,
+  displayName: string,
   busySlots: PersonAvailability['busySlots']
 ) {
-  const uid = requireUserId();
-  const availabilityRef = doc(db, 'households', householdId, 'availability', `${date}_${uid}`);
+  const availabilityRef = doc(db, 'households', householdId, 'availability', `${date}_${userId}`);
   const availabilityDoc = await getDoc(availabilityRef);
-  if (!availabilityDoc.exists()) {
-    throw new Error('No availability uploaded for this day.');
+
+  if (availabilityDoc.exists()) {
+    await setDoc(
+      availabilityRef,
+      {
+        busySlots,
+        updatedAt: serverTimestamp(),
+      },
+      { merge: true }
+    );
+    return;
   }
 
-  await setDoc(
-    availabilityRef,
-    {
-      busySlots,
-      updatedAt: serverTimestamp(),
-    },
-    { merge: true }
-  );
+  await setDoc(availabilityRef, {
+    date,
+    userId,
+    displayName,
+    busySlots,
+    confidence: 'manual',
+    updatedAt: serverTimestamp(),
+  });
 }
 
 export async function listMyAvailability(

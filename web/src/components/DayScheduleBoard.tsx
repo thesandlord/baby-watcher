@@ -8,6 +8,7 @@ import {
   type ScheduleSlot,
 } from '@baby-watcher/shared';
 import { memberColor, memberInitials } from '../lib/members';
+import { parseWallClockTime } from '../lib/timezone';
 import {
   formatDisplayDate,
   formatShortDate,
@@ -16,7 +17,11 @@ import {
 } from '../lib/utils';
 import type { UploadedAvailability } from '../lib/firestore-api';
 
-const SLOT_HEIGHT_REM = 3;
+const SLOT_HEIGHT_REM = 1.5;
+const DRAG_THRESHOLD_PX = 6;
+const MIN_MEETING_MINUTES = SLOT_MINUTES;
+
+const DEFAULT_MEETING_MINUTES = SLOT_MINUTES * 2;
 
 interface DayScheduleBoardProps {
   date: string;
@@ -31,8 +36,7 @@ interface DayScheduleBoardProps {
   onGenerate: (date: string) => void;
   onUploadStatus: (date: string) => void;
   onEditSlot: (date: string, slot: ScheduleSlot) => void;
-  onUpdateBusySlots?: (date: string, busySlots: BusySlot[]) => void;
-  currentUserId: string;
+  onUpdateBusySlots?: (date: string, userId: string, busySlots: BusySlot[]) => void;
   renderSlotCell: (props: {
     date: string;
     slot: ScheduleSlot;
@@ -40,6 +44,24 @@ interface DayScheduleBoardProps {
     disabled: boolean;
     onClick: () => void;
   }) => ReactNode;
+}
+
+interface MeetingFormState {
+  mode: 'add' | 'edit';
+  memberUserId: string;
+  memberName: string;
+  slotIndex: number;
+  busySlot: BusySlot;
+}
+
+function sortBusySlots(slots: BusySlot[]): BusySlot[] {
+  return [...slots].sort((a, b) => a.start.localeCompare(b.start) || a.end.localeCompare(b.end));
+}
+
+function defaultMeetingEnd(start: string, metrics: ReturnType<typeof workdayMetrics>): string {
+  const startMinutes = timeToMinutes(start);
+  const endMinutes = Math.min(startMinutes + DEFAULT_MEETING_MINUTES, metrics.endMinutes);
+  return minutesToTime(Math.max(endMinutes, startMinutes + MIN_MEETING_MINUTES));
 }
 
 function timeToMinutes(time: string): number {
@@ -121,6 +143,29 @@ function shiftBusySlot(
   };
 }
 
+function resizeBusySlot(
+  busySlot: BusySlot,
+  edge: 'start' | 'end',
+  deltaMinutes: number,
+  metrics: ReturnType<typeof workdayMetrics>
+): BusySlot {
+  const startMinutes = timeToMinutes(busySlot.start);
+  const endMinutes = timeToMinutes(busySlot.end);
+  const snappedDelta = snapMinutes(deltaMinutes);
+
+  if (edge === 'start') {
+    let nextStart = snapMinutes(startMinutes + snappedDelta);
+    nextStart = Math.max(metrics.startMinutes, Math.min(nextStart, endMinutes - MIN_MEETING_MINUTES));
+    return { ...busySlot, start: minutesToTime(nextStart) };
+  }
+
+  let nextEnd = snapMinutes(endMinutes + snappedDelta);
+  nextEnd = Math.min(metrics.endMinutes, Math.max(nextEnd, startMinutes + MIN_MEETING_MINUTES));
+  return { ...busySlot, end: minutesToTime(nextEnd) };
+}
+
+type InteractionMode = 'idle' | 'drag' | 'resize-start' | 'resize-end';
+
 interface MeetingBlockProps {
   busySlot: BusySlot;
   slotIndex: number;
@@ -132,6 +177,7 @@ interface MeetingBlockProps {
   disabled: boolean;
   busySlots: BusySlot[];
   onUpdateBusySlots: (busySlots: BusySlot[]) => void;
+  onEdit: () => void;
 }
 
 function MeetingBlock({
@@ -145,25 +191,77 @@ function MeetingBlock({
   disabled,
   busySlots,
   onUpdateBusySlots,
+  onEdit,
 }: MeetingBlockProps) {
   const [dragOffsetY, setDragOffsetY] = useState(0);
-  const [dragging, setDragging] = useState(false);
+  const [interacting, setInteracting] = useState(false);
   const startClientYRef = useRef(0);
-  const draggingRef = useRef(false);
+  const modeRef = useRef<InteractionMode>('idle');
+  const movedRef = useRef(false);
+  const blockRef = useRef<HTMLDivElement>(null);
 
-  function finishDrag(deltaY: number) {
-    if (!editable || disabled || trackHeight <= 0 || deltaY === 0) {
+  function finishInteraction(deltaY: number) {
+    if (!editable || disabled || trackHeight <= 0) {
+      return;
+    }
+
+    const mode = modeRef.current;
+    if (mode === 'idle' || deltaY === 0) {
       return;
     }
 
     const deltaMinutes = (deltaY / trackHeight) * metrics.totalMinutes;
-    const nextSlot = shiftBusySlot(busySlot, deltaMinutes, metrics);
-    if (nextSlot.start === busySlot.start && nextSlot.end === busySlot.end) {
+
+    if (mode === 'drag') {
+      const nextSlot = shiftBusySlot(busySlot, deltaMinutes, metrics);
+      if (nextSlot.start === busySlot.start && nextSlot.end === busySlot.end) {
+        return;
+      }
+      const nextBusySlots = busySlots.map((slot, index) => (index === slotIndex ? nextSlot : slot));
+      onUpdateBusySlots(nextBusySlots);
       return;
     }
 
+    const edge = mode === 'resize-start' ? 'start' : 'end';
+    const nextSlot = resizeBusySlot(busySlot, edge, deltaMinutes, metrics);
+    if (nextSlot.start === busySlot.start && nextSlot.end === busySlot.end) {
+      return;
+    }
     const nextBusySlots = busySlots.map((slot, index) => (index === slotIndex ? nextSlot : slot));
     onUpdateBusySlots(nextBusySlots);
+  }
+
+  function resetInteraction() {
+    modeRef.current = 'idle';
+    movedRef.current = false;
+    setInteracting(false);
+    setDragOffsetY(0);
+  }
+
+  function resolveMode(target: EventTarget | null): InteractionMode {
+    if (!(target instanceof Element)) {
+      return 'drag';
+    }
+    if (target.closest('.day-meeting-resize-start')) {
+      return 'resize-start';
+    }
+    if (target.closest('.day-meeting-resize-end')) {
+      return 'resize-end';
+    }
+    return 'drag';
+  }
+
+  function beginInteraction(event: React.PointerEvent) {
+    if (!editable || disabled) {
+      return;
+    }
+    const mode = resolveMode(event.target);
+    blockRef.current?.setPointerCapture(event.pointerId);
+    startClientYRef.current = event.clientY;
+    modeRef.current = mode;
+    movedRef.current = false;
+    setInteracting(true);
+    setDragOffsetY(0);
   }
 
   const blockStyle = meetingBlockStyle(busySlot, metrics);
@@ -171,9 +269,13 @@ function MeetingBlock({
     return null;
   }
 
+  const isDragging = modeRef.current === 'drag' && interacting;
+  const isResizing = interacting && modeRef.current.startsWith('resize');
+
   return (
     <div
-      className={`day-meeting-block${editable ? ' draggable' : ''}${dragging ? ' dragging' : ''}`}
+      ref={blockRef}
+      className={`day-meeting-block${editable ? ' editable' : ''}${isDragging ? ' dragging' : ''}${isResizing ? ' resizing' : ''}`}
       data-testid={`meeting-${memberUserId}-${busySlot.start}`}
       style={{
         ...blockStyle,
@@ -187,54 +289,66 @@ function MeetingBlock({
       }
       onPointerDown={
         editable && !disabled
-          ? (event) => {
-              event.currentTarget.setPointerCapture(event.pointerId);
-              startClientYRef.current = event.clientY;
-              draggingRef.current = true;
-              setDragging(true);
-              setDragOffsetY(0);
-            }
+          ? beginInteraction
           : undefined
       }
       onPointerMove={
         editable && !disabled
           ? (event) => {
-              if (!draggingRef.current) {
+              if (modeRef.current === 'idle') {
                 return;
               }
-              setDragOffsetY(event.clientY - startClientYRef.current);
+              const deltaY = event.clientY - startClientYRef.current;
+              if (Math.abs(deltaY) > DRAG_THRESHOLD_PX) {
+                movedRef.current = true;
+              }
+              if (modeRef.current === 'drag') {
+                setDragOffsetY(deltaY);
+              }
             }
           : undefined
       }
       onPointerUp={
         editable && !disabled
           ? (event) => {
-              if (!draggingRef.current) {
+              if (modeRef.current === 'idle') {
                 return;
               }
               const deltaY = event.clientY - startClientYRef.current;
-              draggingRef.current = false;
-              setDragging(false);
-              setDragOffsetY(0);
-              finishDrag(deltaY);
+              const mode = modeRef.current;
+              const didMove = movedRef.current;
+              resetInteraction();
+              if (!didMove && mode === 'drag') {
+                onEdit();
+                return;
+              }
+              finishInteraction(deltaY);
             }
           : undefined
       }
       onPointerCancel={
         editable && !disabled
-          ? () => {
-              draggingRef.current = false;
-              setDragging(false);
-              setDragOffsetY(0);
-            }
+          ? () => resetInteraction()
           : undefined
       }
     >
+      {editable ? (
+        <div
+          className="day-meeting-resize-handle day-meeting-resize-start"
+          aria-hidden="true"
+        />
+      ) : null}
       <span className="day-meeting-time">
         {formatSlotTime(busySlot.start)}–{formatSlotTime(busySlot.end)}
       </span>
       {busySlot.title ? (
         <span className="day-meeting-title">{busySlot.title}</span>
+      ) : null}
+      {editable ? (
+        <div
+          className="day-meeting-resize-handle day-meeting-resize-end"
+          aria-hidden="true"
+        />
       ) : null}
     </div>
   );
@@ -314,6 +428,116 @@ function DayNowLine({
   );
 }
 
+interface MeetingFormModalProps {
+  date: string;
+  form: MeetingFormState;
+  busy: boolean;
+  editStart: string;
+  editEnd: string;
+  editTitle: string;
+  editError: string | null;
+  onEditStartChange: (value: string) => void;
+  onEditEndChange: (value: string) => void;
+  onEditTitleChange: (value: string) => void;
+  onSave: () => void;
+  onRemove?: () => void;
+  onClose: () => void;
+}
+
+function MeetingFormModal({
+  date,
+  form,
+  busy,
+  editStart,
+  editEnd,
+  editTitle,
+  editError,
+  onEditStartChange,
+  onEditEndChange,
+  onEditTitleChange,
+  onSave,
+  onRemove,
+  onClose,
+}: MeetingFormModalProps) {
+  const isAdd = form.mode === 'add';
+
+  return (
+    <div className="modal-backdrop" role="presentation" onClick={onClose}>
+      <div
+        className="modal-sheet"
+        role="dialog"
+        aria-modal="true"
+        aria-label={isAdd ? 'Add meeting' : 'Edit meeting'}
+        onClick={(event) => event.stopPropagation()}
+      >
+        <h2 className="hero-title" style={{ fontSize: '1.25rem' }}>
+          {isAdd ? 'Add meeting' : 'Edit meeting'}
+        </h2>
+        <p className="hero-subtitle">
+          {form.memberName} · {formatDisplayDate(date)}
+        </p>
+        {editError ? <div className="error-banner">{editError}</div> : null}
+        <div className="meeting-edit-fields meeting-edit-fields-stack">
+          <label>
+            <span className="field-label">Title (optional)</span>
+            <input
+              className="date-input"
+              type="text"
+              value={editTitle}
+              disabled={busy}
+              placeholder="Meeting name"
+              onChange={(event) => onEditTitleChange(event.target.value)}
+            />
+          </label>
+          <label>
+            <span className="field-label">Start</span>
+            <input
+              className="date-input"
+              type="time"
+              value={editStart}
+              disabled={busy}
+              onChange={(event) => onEditStartChange(event.target.value)}
+            />
+          </label>
+          <label>
+            <span className="field-label">End</span>
+            <input
+              className="date-input"
+              type="time"
+              value={editEnd}
+              disabled={busy}
+              onChange={(event) => onEditEndChange(event.target.value)}
+            />
+          </label>
+        </div>
+        <div className="modal-actions">
+          <button
+            type="button"
+            className="primary-button"
+            disabled={busy}
+            onClick={onSave}
+          >
+            {isAdd ? 'Add' : 'Save'}
+          </button>
+          {!isAdd && onRemove ? (
+            <button
+              type="button"
+              className="ghost-button danger-button"
+              disabled={busy}
+              onClick={onRemove}
+            >
+              Remove
+            </button>
+          ) : null}
+          <button type="button" className="ghost-button" disabled={busy} onClick={onClose}>
+            Cancel
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function DayScheduleBoard({
   date,
   profile,
@@ -328,7 +552,6 @@ export function DayScheduleBoard({
   onUploadStatus,
   onEditSlot,
   onUpdateBusySlots,
-  currentUserId,
   renderSlotCell,
 }: DayScheduleBoardProps) {
   const members = profile.household?.members ?? [];
@@ -341,7 +564,13 @@ export function DayScheduleBoard({
   const slotsEndRef = useRef<HTMLDivElement>(null);
   const trackRef = useRef<HTMLDivElement>(null);
   const [trackHeight, setTrackHeight] = useState(0);
+  const [meetingForm, setMeetingForm] = useState<MeetingFormState | null>(null);
+  const [editStart, setEditStart] = useState('');
+  const [editEnd, setEditEnd] = useState('');
+  const [editTitle, setEditTitle] = useState('');
+  const [editError, setEditError] = useState<string | null>(null);
   const boardHeight = `${timeSlots.length * SLOT_HEIGHT_REM}rem`;
+  const canEditMeetings = Boolean(onUpdateBusySlots);
 
   useLayoutEffect(() => {
     const track = trackRef.current;
@@ -358,6 +587,126 @@ export function DayScheduleBoard({
     observer.observe(track);
     return () => observer.disconnect();
   }, [boardHeight, timeSlots.length]);
+
+  function openMeetingEditor(
+    memberUserId: string,
+    memberName: string,
+    slotIndex: number,
+    busySlot: BusySlot
+  ) {
+    setMeetingForm({ mode: 'edit', memberUserId, memberName, slotIndex, busySlot });
+    setEditStart(busySlot.start);
+    setEditEnd(busySlot.end);
+    setEditTitle(busySlot.title ?? '');
+    setEditError(null);
+  }
+
+  function openAddMeeting(
+    memberUserId: string,
+    memberName: string,
+    start: string,
+    end: string
+  ) {
+    setMeetingForm({
+      mode: 'add',
+      memberUserId,
+      memberName,
+      slotIndex: -1,
+      busySlot: { start, end },
+    });
+    setEditStart(start);
+    setEditEnd(end);
+    setEditTitle('');
+    setEditError(null);
+  }
+
+  function closeMeetingForm() {
+    setMeetingForm(null);
+    setEditError(null);
+  }
+
+  function validateMeetingTimes(start: string, end: string): string | null {
+    const parsedStart = parseWallClockTime(start);
+    const parsedEnd = parseWallClockTime(end);
+    if (!parsedStart || !parsedEnd) {
+      return 'Enter valid start and end times.';
+    }
+    if (parsedStart >= parsedEnd) {
+      return 'End time must be after start time.';
+    }
+    if (timeToMinutes(parsedEnd) - timeToMinutes(parsedStart) < MIN_MEETING_MINUTES) {
+      return `Meetings must be at least ${MIN_MEETING_MINUTES} minutes.`;
+    }
+    return null;
+  }
+
+  function saveMeetingForm() {
+    if (!meetingForm || !onUpdateBusySlots) {
+      return;
+    }
+
+    const validationError = validateMeetingTimes(editStart, editEnd);
+    if (validationError) {
+      setEditError(validationError);
+      return;
+    }
+
+    const start = parseWallClockTime(editStart)!;
+    const end = parseWallClockTime(editEnd)!;
+    const title = editTitle.trim();
+    const busySlots = getMemberBusySlots(meetingForm.memberUserId, date, householdUploads);
+    const nextSlot: BusySlot = {
+      ...meetingForm.busySlot,
+      start,
+      end,
+      title: title || undefined,
+    };
+
+    const nextBusySlots =
+      meetingForm.mode === 'add'
+        ? sortBusySlots([...busySlots, nextSlot])
+        : sortBusySlots(
+            busySlots.map((slot, index) => (index === meetingForm.slotIndex ? nextSlot : slot))
+          );
+
+    onUpdateBusySlots(date, meetingForm.memberUserId, nextBusySlots);
+    closeMeetingForm();
+  }
+
+  function removeMeeting() {
+    if (!meetingForm || meetingForm.mode !== 'edit' || !onUpdateBusySlots) {
+      return;
+    }
+    const busySlots = getMemberBusySlots(meetingForm.memberUserId, date, householdUploads);
+    const nextBusySlots = busySlots.filter((_, index) => index !== meetingForm.slotIndex);
+    onUpdateBusySlots(date, meetingForm.memberUserId, nextBusySlots);
+    closeMeetingForm();
+  }
+
+  function handleTrackClick(
+    event: React.MouseEvent<HTMLDivElement>,
+    memberUserId: string,
+    memberName: string
+  ) {
+    if (!canEditMeetings || busy) {
+      return;
+    }
+    if ((event.target as Element).closest('.day-meeting-block')) {
+      return;
+    }
+
+    const track = event.currentTarget;
+    const rect = track.getBoundingClientRect();
+    if (rect.height <= 0) {
+      return;
+    }
+
+    const fraction = (event.clientY - rect.top) / rect.height;
+    const clickedMinutes = metrics.startMinutes + fraction * metrics.totalMinutes;
+    const start = minutesToTime(snapMinutes(clickedMinutes));
+    const end = defaultMeetingEnd(start, metrics);
+    openAddMeeting(memberUserId, memberName, start, end);
+  }
 
   return (
     <div className="day-board-wrapper" ref={boardRef}>
@@ -408,7 +757,27 @@ export function DayScheduleBoard({
           </div>
           <div className="day-watch-divider" aria-hidden="true" />
           {members.map((member) => (
-            <div className="day-member-action-spacer" key={member.userId} aria-hidden="true" />
+            <div className="day-member-action" key={member.userId}>
+              {canEditMeetings ? (
+                <button
+                  type="button"
+                  className="icon-button add-meeting-button"
+                  data-testid={`add-meeting-${date}-${member.userId}`}
+                  aria-label={`Add meeting for ${member.displayName}`}
+                  disabled={busy}
+                  onClick={() =>
+                    openAddMeeting(
+                      member.userId,
+                      member.displayName,
+                      WORKDAY_START,
+                      defaultMeetingEnd(WORKDAY_START, metrics)
+                    )
+                  }
+                >
+                  +
+                </button>
+              ) : null}
+            </div>
           ))}
         </div>
 
@@ -455,11 +824,18 @@ export function DayScheduleBoard({
           {members.map((member) => {
             const busySlots = getMemberBusySlots(member.userId, date, householdUploads);
             const accent = memberColor(member.userId, memberIds);
-            const editable = member.userId === currentUserId && Boolean(onUpdateBusySlots);
 
             return (
               <div className="day-meetings-column" key={member.userId}>
-                <div className="day-meetings-track" style={{ minHeight: boardHeight }}>
+                <div
+                  className={`day-meetings-track${canEditMeetings ? ' addable' : ''}`}
+                  style={{ minHeight: boardHeight }}
+                  onClick={
+                    canEditMeetings
+                      ? (event) => handleTrackClick(event, member.userId, member.displayName)
+                      : undefined
+                  }
+                >
                   {busySlots.map((busySlot, index) => (
                     <MeetingBlock
                       key={`${busySlot.start}-${busySlot.end}-${index}`}
@@ -469,10 +845,15 @@ export function DayScheduleBoard({
                       accent={accent}
                       metrics={metrics}
                       trackHeight={trackHeight}
-                      editable={editable}
+                      editable={canEditMeetings}
                       disabled={busy}
                       busySlots={busySlots}
-                      onUpdateBusySlots={(nextBusySlots) => onUpdateBusySlots?.(date, nextBusySlots)}
+                      onUpdateBusySlots={(nextBusySlots) =>
+                        onUpdateBusySlots?.(date, member.userId, nextBusySlots)
+                      }
+                      onEdit={() =>
+                        openMeetingEditor(member.userId, member.displayName, index, busySlot)
+                      }
                     />
                   ))}
                 </div>
@@ -490,6 +871,24 @@ export function DayScheduleBoard({
         slotsEndRef={slotsEndRef}
         trackRef={trackRef}
       />
+
+      {meetingForm ? (
+        <MeetingFormModal
+          date={date}
+          form={meetingForm}
+          busy={busy}
+          editStart={editStart}
+          editEnd={editEnd}
+          editTitle={editTitle}
+          editError={editError}
+          onEditStartChange={setEditStart}
+          onEditEndChange={setEditEnd}
+          onEditTitleChange={setEditTitle}
+          onSave={saveMeetingForm}
+          onRemove={meetingForm.mode === 'edit' ? removeMeeting : undefined}
+          onClose={closeMeetingForm}
+        />
+      ) : null}
     </div>
   );
 }

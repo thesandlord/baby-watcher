@@ -29,7 +29,7 @@ test('manages days and extracted schedules independently', async ({ page }) => {
   await openProfile(page);
   const upload = page.getByTestId(`upload-${NEXT_DATE}`);
   await upload.locator('summary').click();
-  await expect(upload).toContainText('09:00–11:00');
+  await expect(upload).toContainText('09:00–09:30');
 
   page.once('dialog', (dialog) => dialog.dismiss());
   await page.getByTestId(`upload-delete-${NEXT_DATE}`).click();

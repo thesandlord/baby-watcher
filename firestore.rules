@@ -25,6 +25,10 @@ service cloud.firestore {
         && request.resource.data.inviteCode == resource.data.inviteCode;
     }
 
+    function memberInHousehold(memberId, householdId) {
+      return get(/databases/$(database)/documents/users/$(memberId)).data.householdId == householdId;
+    }
+
     match /users/{userId} {
       allow read: if signedIn() && (
         isSelf(userId) ||
@@ -42,10 +46,14 @@ service cloud.firestore {
 
       match /availability/{docId} {
         allow read: if inHousehold(householdId);
-        allow create, update: if inHousehold(householdId)
-          && docId == request.resource.data.date + '_' + request.auth.uid
-          && request.resource.data.userId == request.auth.uid
-          && request.resource.data.date is string;
+        allow create: if inHousehold(householdId)
+          && docId == request.resource.data.date + '_' + request.resource.data.userId
+          && request.resource.data.date is string
+          && memberInHousehold(request.resource.data.userId, householdId);
+        allow update: if inHousehold(householdId)
+          && docId == resource.data.date + '_' + resource.data.userId
+          && request.resource.data.userId == resource.data.userId
+          && request.resource.data.date == resource.data.date;
         allow delete: if inHousehold(householdId)
           && docId == resource.data.date + '_' + request.auth.uid
           && resource.data.userId == request.auth.uid;

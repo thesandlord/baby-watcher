@@ -11,6 +11,7 @@ import {
 } from '@dnd-kit/core';
 import {
   generateTimeSlots,
+  SLOT_MINUTES,
   WORKDAY_END,
   WORKDAY_START,
   type BusySlot,
@@ -52,7 +53,7 @@ interface ScheduleViewProps {
   onGenerate: (date: string) => void;
   onSwap: (sourceDate: string, sourceStart: string, targetDate: string, targetStart: string) => void;
   onAssign: (date: string, start: string, watcherId: string | null) => void;
-  onUpdateBusySlots?: (date: string, busySlots: BusySlot[]) => void;
+  onUpdateBusySlots?: (date: string, userId: string, busySlots: BusySlot[]) => void;
   onDeleteUpload: (date: string) => void;
   onCleanupOldUploads: () => void;
   onSignOut: () => void;
@@ -146,7 +147,7 @@ export function ScheduleView({
     useSensor(TouchSensor, { activationConstraint: { delay: 200, tolerance: 6 } })
   );
   const firstSchedule = viewDates.map((date) => schedules[date]).find(Boolean);
-  const timeSlots = firstSchedule?.slots ?? generateTimeSlots(WORKDAY_START, WORKDAY_END, 30);
+  const timeSlots = firstSchedule?.slots ?? generateTimeSlots(WORKDAY_START, WORKDAY_END, SLOT_MINUTES);
   const gridWrapperRef = useRef<HTMLDivElement>(null);
   const slotsStartRef = useRef<HTMLDivElement>(null);
   const slotsEndRef = useRef<HTMLDivElement>(null);
@@ -255,7 +256,6 @@ export function ScheduleView({
               busy={busy}
               showNowLine={showNowLine}
               nowLineFraction={nowLineFraction ?? 0}
-              currentUserId={profile.uid}
               onGenerate={onGenerate}
               onUploadStatus={setUploadStatusDate}
               onEditSlot={(date, slot) => setEditing({ date, slot })}
