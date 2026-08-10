@@ -25,6 +25,7 @@
   --overlay: rgba(15, 23, 42, 0.45);
   --input-bg: rgba(255, 255, 255, 0.95);
   --chip-text: #312e81;
+  --now-line: #ea4335;
 }
 
 [data-theme='dark'] {
@@ -51,6 +52,7 @@
   --overlay: rgba(2, 6, 23, 0.72);
   --input-bg: rgba(15, 23, 42, 0.92);
   --chip-text: #e0e7ff;
+  --now-line: #f87171;
 }
 
 * {
@@ -490,6 +492,10 @@ button {
   box-shadow: var(--shadow);
 }
 
+.week-grid-wrapper {
+  position: relative;
+}
+
 .week-grid {
   display: grid;
   grid-template-columns: 4.8rem repeat(5, minmax(175px, 1fr));
@@ -545,6 +551,31 @@ button {
 .week-day-header.active strong {
   background: var(--accent);
   color: white;
+}
+
+.week-day-header.today:not(.active) strong {
+  outline: 2px solid var(--now-line);
+  outline-offset: 1px;
+}
+
+.week-now-line {
+  position: absolute;
+  z-index: 3;
+  height: 2px;
+  background: var(--now-line);
+  pointer-events: none;
+}
+
+.week-now-line::before {
+  content: '';
+  position: absolute;
+  left: -0.35rem;
+  top: 50%;
+  width: 0.65rem;
+  height: 0.65rem;
+  border-radius: 50%;
+  background: var(--now-line);
+  transform: translateY(-50%);
 }
 
 .week-time {
