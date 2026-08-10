@@ -90,7 +90,7 @@ export function formatViewHeading(dates: string[]): string {
 }
 
 export function formatShortDate(date: string): string {
-  return formatCalendarDate(date, { month: 'short', day: 'numeric' });
+  return formatCalendarDate(date, { weekday: 'short', month: 'short', day: 'numeric' });
 }
 
 export function weekdayDates(weekStart: string): string[] {
