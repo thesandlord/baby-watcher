@@ -13,8 +13,16 @@ service cloud.firestore {
       return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.householdId;
     }
 
+    function userRole() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('role', 'watcher');
+    }
+
     function inHousehold(householdId) {
       return signedIn() && userHousehold() == householdId;
+    }
+
+    function isWatcher(householdId) {
+      return inHousehold(householdId) && userRole() != 'viewer';
     }
 
     function isJoiningHousehold(householdId) {
@@ -27,6 +35,11 @@ service cloud.firestore {
 
     function memberInHousehold(memberId, householdId) {
       return get(/databases/$(database)/documents/users/$(memberId)).data.householdId == householdId;
+    }
+
+    function householdWatcher(memberId, householdId) {
+      return memberInHousehold(memberId, householdId)
+        && get(/databases/$(database)/documents/users/$(memberId)).data.get('role', 'watcher') != 'viewer';
     }
 
     match /users/{userId} {
@@ -46,22 +59,22 @@ service cloud.firestore {
 
       match /availability/{docId} {
         allow read: if inHousehold(householdId);
-        allow create: if inHousehold(householdId)
+        allow create: if isWatcher(householdId)
           && docId == request.resource.data.date + '_' + request.resource.data.userId
           && request.resource.data.date is string
-          && memberInHousehold(request.resource.data.userId, householdId);
-        allow update: if inHousehold(householdId)
+          && householdWatcher(request.resource.data.userId, householdId);
+        allow update: if isWatcher(householdId)
           && docId == resource.data.date + '_' + resource.data.userId
           && request.resource.data.userId == resource.data.userId
           && request.resource.data.date == resource.data.date;
-        allow delete: if inHousehold(householdId)
+        allow delete: if isWatcher(householdId)
           && docId == resource.data.date + '_' + request.auth.uid
           && resource.data.userId == request.auth.uid;
       }
 
       match /schedules/{date} {
         allow read: if inHousehold(householdId);
-        allow create, update: if inHousehold(householdId);
+        allow create, update: if isWatcher(householdId);
         allow delete: if false;
       }
     }

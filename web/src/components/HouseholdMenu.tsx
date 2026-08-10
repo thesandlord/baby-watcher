@@ -9,6 +9,7 @@ interface HouseholdMenuProps {
   uploads: UploadedAvailability[];
   busy: boolean;
   open: boolean;
+  canEditSchedule: boolean;
   onClose: () => void;
   onDeleteUpload: (date: string) => void;
   onCleanupOldUploads: () => void;
@@ -21,6 +22,7 @@ export function HouseholdMenu({
   uploads,
   busy,
   open,
+  canEditSchedule,
   onClose,
   onDeleteUpload,
   onCleanupOldUploads,
@@ -68,6 +70,9 @@ export function HouseholdMenu({
           <div>
             <span className="field-label">Signed in as</span>
             <strong>{profile.displayName}</strong>
+            {profile.role === 'viewer' ? (
+              <div className="role-badge role-badge-viewer">Viewer</div>
+            ) : null}
             {profile.email ? <div className="muted-copy">{profile.email}</div> : null}
           </div>
 
@@ -83,6 +88,9 @@ export function HouseholdMenu({
                     {memberInitials(member.displayName)}
                   </span>
                   {member.displayName}
+                  {member.role === 'viewer' ? (
+                    <span className="role-badge role-badge-viewer">Viewer</span>
+                  ) : null}
                 </span>
               ))}
             </div>
@@ -106,68 +114,70 @@ export function HouseholdMenu({
             </div>
           ) : null}
 
-          <div>
-            <span className="field-label">My uploaded schedules</span>
-            <div className="upload-list">
-              {uploads.map((upload) => (
-                <details
-                  key={upload.date}
-                  className="upload-card"
-                  data-testid={`upload-${upload.date}`}
-                >
-                  <summary>
-                    <span>
-                      <strong>{upload.date}</strong>
-                      <small>
-                        {upload.busySlots.length} busy {upload.busySlots.length === 1 ? 'period' : 'periods'}
-                      </small>
-                    </span>
-                    <span className="schedule-badge">{upload.confidence}</span>
-                  </summary>
-                  <div className="upload-periods">
-                    {upload.busySlots.length > 0 ? upload.busySlots.map((slot, index) => (
-                      <span key={`${slot.start}-${slot.end}-${index}`}>
-                        {slot.start}–{slot.end}{slot.title ? ` · ${slot.title}` : ''}
+          {canEditSchedule ? (
+            <div>
+              <span className="field-label">My uploaded schedules</span>
+              <div className="upload-list">
+                {uploads.map((upload) => (
+                  <details
+                    key={upload.date}
+                    className="upload-card"
+                    data-testid={`upload-${upload.date}`}
+                  >
+                    <summary>
+                      <span>
+                        <strong>{upload.date}</strong>
+                        <small>
+                          {upload.busySlots.length} busy {upload.busySlots.length === 1 ? 'period' : 'periods'}
+                        </small>
                       </span>
-                    )) : <span>No busy periods</span>}
-                  </div>
-                  <div className="upload-actions">
-                    <button
-                      type="button"
-                      className="secondary-button"
-                      data-testid={`upload-view-${upload.date}`}
-                      onClick={() => onSelectUploadDate(upload.date)}
-                    >
-                      View day
-                    </button>
-                    <button
-                      type="button"
-                      className="ghost-button danger-button"
-                      data-testid={`upload-delete-${upload.date}`}
-                      disabled={busy}
-                      onClick={() => onDeleteUpload(upload.date)}
-                    >
-                      Delete
-                    </button>
-                  </div>
-                </details>
-              ))}
-              {uploads.length === 0 ? (
-                <p className="muted-copy">No extracted schedules uploaded yet.</p>
+                      <span className="schedule-badge">{upload.confidence}</span>
+                    </summary>
+                    <div className="upload-periods">
+                      {upload.busySlots.length > 0 ? upload.busySlots.map((slot, index) => (
+                        <span key={`${slot.start}-${slot.end}-${index}`}>
+                          {slot.start}–{slot.end}{slot.title ? ` · ${slot.title}` : ''}
+                        </span>
+                      )) : <span>No busy periods</span>}
+                    </div>
+                    <div className="upload-actions">
+                      <button
+                        type="button"
+                        className="secondary-button"
+                        data-testid={`upload-view-${upload.date}`}
+                        onClick={() => onSelectUploadDate(upload.date)}
+                      >
+                        View day
+                      </button>
+                      <button
+                        type="button"
+                        className="ghost-button danger-button"
+                        data-testid={`upload-delete-${upload.date}`}
+                        disabled={busy}
+                        onClick={() => onDeleteUpload(upload.date)}
+                      >
+                        Delete
+                      </button>
+                    </div>
+                  </details>
+                ))}
+                {uploads.length === 0 ? (
+                  <p className="muted-copy">No extracted schedules uploaded yet.</p>
+                ) : null}
+              </div>
+              {pastUploadCount > 0 ? (
+                <button
+                  type="button"
+                  className="secondary-button danger-button"
+                  data-testid="cleanup-old-uploads"
+                  disabled={busy}
+                  onClick={onCleanupOldUploads}
+                >
+                  Clean up {pastUploadCount} past schedule{pastUploadCount === 1 ? '' : 's'}
+                </button>
               ) : null}
             </div>
-            {pastUploadCount > 0 ? (
-              <button
-                type="button"
-                className="secondary-button danger-button"
-                data-testid="cleanup-old-uploads"
-                disabled={busy}
-                onClick={onCleanupOldUploads}
-              >
-                Clean up {pastUploadCount} past schedule{pastUploadCount === 1 ? '' : 's'}
-              </button>
-            ) : null}
-          </div>
+          ) : null}
 
           <ThemeToggle />
 

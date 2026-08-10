@@ -22,7 +22,8 @@ import {
   type ScheduleSlot,
 } from '@baby-watcher/shared';
 import { auth, db } from './firebase';
-import type { UserProfile } from './utils';
+import type { UserProfile, HouseholdRole } from './utils';
+import { normalizeHouseholdRole } from './utils';
 
 export interface UploadedAvailability {
   date: string;
@@ -64,16 +65,19 @@ async function getHouseholdMembers(householdId: string) {
   return snapshot.docs.map((memberDoc) => ({
     userId: memberDoc.id,
     displayName: (memberDoc.data().displayName as string) ?? memberDoc.id,
+    role: normalizeHouseholdRole(memberDoc.data().role),
   }));
 }
 
 async function getAvailabilityForDay(
   householdId: string,
-  date: string
+  date: string,
+  members?: Awaited<ReturnType<typeof getHouseholdMembers>>
 ): Promise<PersonAvailability[]> {
-  const members = await getHouseholdMembers(householdId);
+  const householdMembers = members ?? await getHouseholdMembers(householdId);
+  const watchers = householdMembers.filter((member) => member.role !== 'viewer');
   const availability = await Promise.all(
-    members.map(async (member) => {
+    watchers.map(async (member) => {
       const availabilityDoc = await getDoc(
         doc(db, 'households', householdId, 'availability', `${date}_${member.userId}`)
       );
@@ -113,6 +117,7 @@ export async function getProfile(): Promise<UserProfile | null> {
     uid,
     displayName: profile.displayName as string,
     email: (profile.email as string | null) ?? auth.currentUser?.email ?? null,
+    role: normalizeHouseholdRole(profile.role),
     household,
   };
 }
@@ -145,6 +150,7 @@ export async function createHousehold(displayName: string) {
       displayName,
       householdId: householdRef.id,
       email: auth.currentUser?.email ?? null,
+      role: 'watcher',
       updatedAt: serverTimestamp(),
     },
     { merge: true }
@@ -154,7 +160,11 @@ export async function createHousehold(displayName: string) {
   return { householdId: householdRef.id, inviteCode };
 }
 
-export async function joinHousehold(displayName: string, inviteCode: string) {
+export async function joinHousehold(
+  displayName: string,
+  inviteCode: string,
+  role: HouseholdRole = 'watcher'
+) {
   const uid = requireUserId();
   const normalizedCode = inviteCode.trim().toUpperCase();
   const householdQuery = await getDocs(
@@ -167,6 +177,7 @@ export async function joinHousehold(displayName: string, inviteCode: string) {
 
   const householdDoc = householdQuery.docs[0];
   const batch = writeBatch(db);
+  const householdRole: HouseholdRole = role === 'viewer' ? 'viewer' : 'watcher';
 
   batch.update(householdDoc.ref, {
     memberIds: arrayUnion(uid),
@@ -178,6 +189,7 @@ export async function joinHousehold(displayName: string, inviteCode: string) {
       displayName,
       householdId: householdDoc.id,
       email: auth.currentUser?.email ?? null,
+      role: householdRole,
       updatedAt: serverTimestamp(),
     },
     { merge: true }
@@ -388,7 +400,7 @@ export function subscribeHouseholdMembers(
   const membersQuery = query(collection(db, 'users'), where('householdId', '==', householdId));
 
   let householdInviteCode: string | null = null;
-  let members: Array<{ userId: string; displayName: string }> = [];
+  let members: Array<{ userId: string; displayName: string; role: HouseholdRole }> = [];
 
   const emit = () => {
     if (!householdInviteCode && members.length === 0) {
@@ -418,6 +430,7 @@ export function subscribeHouseholdMembers(
       members = snapshot.docs.map((memberDoc) => ({
         userId: memberDoc.id,
         displayName: (memberDoc.data().displayName as string) ?? memberDoc.id,
+        role: normalizeHouseholdRole(memberDoc.data().role),
       }));
       emit();
     },
@@ -485,8 +498,12 @@ export async function regenerateSchedule(
   householdId: string,
   date: string
 ): Promise<DaySchedule> {
-  const people = await getAvailabilityForDay(householdId, date);
-  const watcherIds = people.map((person) => person.userId).sort();
+  const members = await getHouseholdMembers(householdId);
+  const people = await getAvailabilityForDay(householdId, date, members);
+  const watcherIds = members
+    .filter((member) => member.role !== 'viewer')
+    .map((member) => member.userId)
+    .sort();
   const inputHash = hashScheduleInput(date, people, watcherIds);
   const slots = generateSchedule(date, people, watcherIds);
 

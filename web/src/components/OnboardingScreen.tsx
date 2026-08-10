@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { createHousehold, joinHousehold } from '../lib/firestore-api';
+import type { HouseholdRole } from '../lib/utils';
 import { ThemeToggle } from './ThemeToggle';
 
 interface OnboardingScreenProps {
@@ -7,7 +8,7 @@ interface OnboardingScreenProps {
 }
 
 export function OnboardingScreen({ onComplete }: OnboardingScreenProps) {
-  const [mode, setMode] = useState<'create' | 'join'>('create');
+  const [mode, setMode] = useState<'create' | 'join' | 'view'>('create');
   const [displayName, setDisplayName] = useState('');
   const [inviteCode, setInviteCode] = useState('');
   const [createdInviteCode, setCreatedInviteCode] = useState<string | null>(null);
@@ -29,12 +30,12 @@ export function OnboardingScreen({ onComplete }: OnboardingScreenProps) {
     }
   }
 
-  async function handleJoin(event: React.FormEvent<HTMLFormElement>) {
+  async function handleJoin(event: React.FormEvent<HTMLFormElement>, role: HouseholdRole) {
     event.preventDefault();
     setBusy(true);
     setError(null);
     try {
-      await joinHousehold(displayName, inviteCode);
+      await joinHousehold(displayName, inviteCode, role);
       await onComplete();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to join household.');
@@ -56,7 +57,8 @@ export function OnboardingScreen({ onComplete }: OnboardingScreenProps) {
         <div>
           <h1 className="hero-title">Set up your household</h1>
           <p className="hero-subtitle">
-            Create a shared group for family members who rotate baby-watching duty.
+            Create a household for baby-watching duty, join as a watcher, or view the schedule
+            read-only.
           </p>
         </div>
 
@@ -84,6 +86,13 @@ export function OnboardingScreen({ onComplete }: OnboardingScreenProps) {
           >
             Join
           </button>
+          <button
+            type="button"
+            className={mode === 'view' ? 'active' : undefined}
+            onClick={() => setMode('view')}
+          >
+            View only
+          </button>
         </div>
 
         {mode === 'create' ? (
@@ -103,14 +112,17 @@ export function OnboardingScreen({ onComplete }: OnboardingScreenProps) {
             </button>
           </form>
         ) : (
-          <form className="stack" onSubmit={(event) => void handleJoin(event)}>
+          <form
+            className="stack"
+            onSubmit={(event) => void handleJoin(event, mode === 'view' ? 'viewer' : 'watcher')}
+          >
             <label>
               <span className="field-label">Your name</span>
               <input
                 className="text-input"
                 value={displayName}
                 onChange={(event) => setDisplayName(event.target.value)}
-                placeholder="Bob"
+                placeholder={mode === 'view' ? 'Grandma' : 'Bob'}
                 required
               />
             </label>
@@ -124,8 +136,14 @@ export function OnboardingScreen({ onComplete }: OnboardingScreenProps) {
                 required
               />
             </label>
+            {mode === 'view' ? (
+              <p className="muted-copy">
+                Viewers can see the schedule but are not added to watch rotation and cannot upload
+                calendars.
+              </p>
+            ) : null}
             <button type="submit" className="primary-button" disabled={busy}>
-              Join household
+              {mode === 'view' ? 'View household schedule' : 'Join household'}
             </button>
           </form>
         )}

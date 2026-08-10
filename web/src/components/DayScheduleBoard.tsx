@@ -1,4 +1,4 @@
-import { useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode, type RefObject } from 'react';
+import { useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import {
   WORKDAY_END,
   WORKDAY_START,
@@ -14,9 +14,11 @@ import {
   formatDisplayDate,
   formatShortDate,
   formatSlotTime,
+  householdWatchers,
   type UserProfile,
 } from '../lib/utils';
 import type { UploadedAvailability } from '../lib/firestore-api';
+import { CurrentTimeLine } from './CurrentTimeLine';
 
 const SLOT_HEIGHT_REM = 3;
 const DRAG_THRESHOLD_PX = 6;
@@ -32,6 +34,7 @@ interface DayScheduleBoardProps {
   timeSlots: Array<{ start: string; end: string }>;
   memberIds: string[];
   busy: boolean;
+  canEditSchedule: boolean;
   showNowLine: boolean;
   nowLineFraction: number;
   onGenerate: (date: string) => void;
@@ -355,80 +358,6 @@ function MeetingBlock({
   );
 }
 
-interface NowLineProps {
-  visible: boolean;
-  fraction: number;
-  boardRef: RefObject<HTMLDivElement | null>;
-  slotsStartRef: RefObject<HTMLDivElement | null>;
-  slotsEndRef: RefObject<HTMLDivElement | null>;
-  trackRef: RefObject<HTMLDivElement | null>;
-}
-
-function DayNowLine({
-  visible,
-  fraction,
-  boardRef,
-  slotsStartRef,
-  slotsEndRef,
-  trackRef,
-}: NowLineProps) {
-  const [style, setStyle] = useState<CSSProperties | null>(null);
-
-  useLayoutEffect(() => {
-    if (!visible) {
-      setStyle(null);
-      return;
-    }
-
-    function measure() {
-      const board = boardRef.current;
-      const slotsStart = slotsStartRef.current;
-      const slotsEnd = slotsEndRef.current;
-      const track = trackRef.current;
-      if (!board || !slotsStart || !slotsEnd || !track) {
-        setStyle(null);
-        return;
-      }
-
-      const boardRect = board.getBoundingClientRect();
-      const slotsTop = slotsStart.getBoundingClientRect().top - boardRect.top;
-      const slotsHeight =
-        slotsEnd.getBoundingClientRect().bottom - slotsStart.getBoundingClientRect().top;
-      const trackRect = track.getBoundingClientRect();
-
-      setStyle({
-        top: slotsTop + fraction * slotsHeight,
-        left: trackRect.left - boardRect.left,
-        width: trackRect.width,
-      });
-    }
-
-    measure();
-    const observer = new ResizeObserver(measure);
-    if (boardRef.current) {
-      observer.observe(boardRef.current);
-    }
-    window.addEventListener('resize', measure);
-    return () => {
-      observer.disconnect();
-      window.removeEventListener('resize', measure);
-    };
-  }, [visible, fraction, boardRef, slotsStartRef, slotsEndRef, trackRef]);
-
-  if (!visible || !style) {
-    return null;
-  }
-
-  return (
-    <div
-      className="week-now-line"
-      style={style}
-      aria-hidden="true"
-      data-testid="current-time-line"
-    />
-  );
-}
-
 interface MeetingFormModalProps {
   date: string;
   form: MeetingFormState;
@@ -547,6 +476,7 @@ export function DayScheduleBoard({
   timeSlots,
   memberIds,
   busy,
+  canEditSchedule,
   showNowLine,
   nowLineFraction,
   onGenerate,
@@ -555,15 +485,21 @@ export function DayScheduleBoard({
   onUpdateBusySlots,
   renderSlotCell,
 }: DayScheduleBoardProps) {
-  const members = profile.household?.members ?? [];
+  const members = householdWatchers(profile.household?.members ?? []);
   const metrics = workdayMetrics();
   const uploadedCount = new Set(
-    householdUploads.filter((upload) => upload.date === date).map((upload) => upload.userId)
+    householdUploads
+      .filter(
+        (upload) =>
+          upload.date === date && members.some((member) => member.userId === upload.userId)
+      )
+      .map((upload) => upload.userId)
   ).size;
   const boardRef = useRef<HTMLDivElement>(null);
   const slotsStartRef = useRef<HTMLDivElement>(null);
   const slotsEndRef = useRef<HTMLDivElement>(null);
-  const watchColumnRef = useRef<HTMLDivElement>(null);
+  const columnsStartRef = useRef<HTMLDivElement>(null);
+  const columnsEndRef = useRef<HTMLDivElement>(null);
   const meetingsTrackRef = useRef<HTMLDivElement>(null);
   const [trackHeight, setTrackHeight] = useState(0);
   const [meetingForm, setMeetingForm] = useState<MeetingFormState | null>(null);
@@ -742,15 +678,17 @@ export function DayScheduleBoard({
         <div className="day-board-actions">
           <div className="day-actions-label">{formatShortDate(date)}</div>
           <div className="day-watch-actions">
-            <button
-              type="button"
-              data-testid={`generate-${date}`}
-              className={schedule ? 'ghost-button generate-button' : 'primary-button generate-button'}
-              disabled={busy}
-              onClick={() => onGenerate(date)}
-            >
-              {schedule ? 'Regenerate' : 'Generate slots'}
-            </button>
+            {canEditSchedule ? (
+              <button
+                type="button"
+                data-testid={`generate-${date}`}
+                className={schedule ? 'ghost-button generate-button' : 'primary-button generate-button'}
+                disabled={busy}
+                onClick={() => onGenerate(date)}
+              >
+                {schedule ? 'Regenerate' : 'Generate slots'}
+              </button>
+            ) : null}
             <button
               type="button"
               data-testid={`upload-status-${date}`}
@@ -806,15 +744,20 @@ export function DayScheduleBoard({
               </div>
               <div
                 className="day-watch-cell"
-                ref={rowIndex === 0 ? watchColumnRef : undefined}
+                ref={rowIndex === 0 ? columnsStartRef : undefined}
               >
                 {slot
                   ? renderSlotCell({
                       date,
                       slot,
                       memberIds,
-                      disabled: busy,
-                      onClick: () => onEditSlot(date, slot),
+                      disabled: busy || !canEditSchedule,
+                      onClick: () => {
+                        if (!canEditSchedule) {
+                          return;
+                        }
+                        onEditSlot(date, slot);
+                      },
                     })
                   : null}
               </div>
@@ -828,6 +771,7 @@ export function DayScheduleBoard({
                       <div
                         className="day-meetings-column"
                         key={member.userId}
+                        ref={memberIndex === members.length - 1 ? columnsEndRef : undefined}
                         style={{
                           gridRow: `3 / span ${timeSlots.length}`,
                           gridColumn: 4 + memberIndex,
@@ -873,13 +817,14 @@ export function DayScheduleBoard({
         })}
       </div>
 
-      <DayNowLine
+      <CurrentTimeLine
         visible={showNowLine}
         fraction={nowLineFraction}
-        boardRef={boardRef}
+        gridRef={boardRef}
         slotsStartRef={slotsStartRef}
         slotsEndRef={slotsEndRef}
-        trackRef={watchColumnRef}
+        columnsStartRef={columnsStartRef}
+        columnsEndRef={columnsEndRef}
       />
 
       {meetingForm ? (

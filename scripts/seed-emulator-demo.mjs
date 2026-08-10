@@ -116,6 +116,7 @@ async function main() {
       displayName: alice.name,
       householdId,
       email: alice.email,
+      role: 'watcher',
       updatedAt: serverTimestamp(),
     });
   }
@@ -133,6 +134,7 @@ async function main() {
         displayName: member.name,
         householdId,
         email: member.email,
+        role: 'watcher',
         updatedAt: serverTimestamp(),
       });
     }
