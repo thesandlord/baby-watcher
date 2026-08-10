@@ -1,7 +1,7 @@
 import type { CalendarExtractionResult, BusySlot } from '@baby-watcher/shared';
 
 const OPENROUTER_API_URL = 'https://openrouter.ai/api/v1/chat/completions';
-const DEFAULT_VISION_MODEL = 'google/gemma-3-27b-it:free';
+const DEFAULT_VISION_MODEL = 'google/gemma-4-31b-it:free';
 
 const EXTRACTION_PROMPT = `You extract calendar availability from a screenshot for baby-watching schedule planning.
 

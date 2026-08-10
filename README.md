@@ -29,7 +29,7 @@ Everything runs client-side: Firebase Auth + Firestore for data, OpenRouter for 
 npm install
 ```
 
-Recommended free vision model: `google/gemma-3-27b-it:free`
+Recommended free vision model: `google/gemma-4-31b-it:free`
 
 4. Run tests:
 

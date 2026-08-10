@@ -60,7 +60,7 @@ Also create a **`production` environment** in GitHub (Settings → Environments)
 
 | Secret | Description |
 | --- | --- |
-| `VITE_OPENROUTER_VISION_MODEL` | Defaults to `google/gemma-3-27b-it:free` if unset |
+| `VITE_OPENROUTER_VISION_MODEL` | Defaults to `google/gemma-4-31b-it:free` if unset |
 
 Note: `VITE_FIREBASE_PROJECT_ID` is set automatically from `FIREBASE_PROJECT_ID` in the workflow.
 
