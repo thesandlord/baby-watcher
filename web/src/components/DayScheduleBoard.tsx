@@ -563,6 +563,7 @@ export function DayScheduleBoard({
   const boardRef = useRef<HTMLDivElement>(null);
   const slotsStartRef = useRef<HTMLDivElement>(null);
   const slotsEndRef = useRef<HTMLDivElement>(null);
+  const watchColumnRef = useRef<HTMLDivElement>(null);
   const meetingsTrackRef = useRef<HTMLDivElement>(null);
   const [trackHeight, setTrackHeight] = useState(0);
   const [meetingForm, setMeetingForm] = useState<MeetingFormState | null>(null);
@@ -786,12 +787,13 @@ export function DayScheduleBoard({
           ))}
         </div>
 
-        <div className="day-board-body">
-          <div className="day-time-column">
-            {timeSlots.map((timeSlot, rowIndex) => (
+        {timeSlots.map((timeSlot, rowIndex) => {
+          const slot = schedule?.slots[rowIndex];
+
+          return (
+            <div className="day-board-slot-row" key={timeSlot.start}>
               <div
                 className="day-time-label"
-                key={timeSlot.start}
                 ref={
                   rowIndex === 0
                     ? slotsStartRef
@@ -802,70 +804,73 @@ export function DayScheduleBoard({
               >
                 {formatSlotTime(timeSlot.start)}
               </div>
-            ))}
-          </div>
-
-          <div className="day-watch-column">
-            {timeSlots.map((timeSlot, rowIndex) => {
-              const slot = schedule?.slots[rowIndex];
-              return (
-                <div className="day-watch-cell" key={timeSlot.start}>
-                  {slot
-                    ? renderSlotCell({
-                        date,
-                        slot,
-                        memberIds,
-                        disabled: busy,
-                        onClick: () => onEditSlot(date, slot),
-                      })
-                    : null}
-                </div>
-              );
-            })}
-          </div>
-
-          <div className="day-watch-divider day-watch-divider-body" aria-hidden="true" />
-
-          {members.map((member, memberIndex) => {
-            const busySlots = getMemberBusySlots(member.userId, date, householdUploads);
-            const accent = memberColor(member.userId, memberIds);
-
-            return (
-              <div className="day-meetings-column" key={member.userId}>
-                <div
-                  ref={memberIndex === 0 ? meetingsTrackRef : undefined}
-                  className={`day-meetings-track${canEditMeetings ? ' addable' : ''}`}
-                  onClick={
-                    canEditMeetings
-                      ? (event) => handleTrackClick(event, member.userId, member.displayName)
-                      : undefined
-                  }
-                >
-                  {busySlots.map((busySlot, index) => (
-                    <MeetingBlock
-                      key={`${busySlot.start}-${busySlot.end}-${index}`}
-                      busySlot={busySlot}
-                      slotIndex={index}
-                      memberUserId={member.userId}
-                      accent={accent}
-                      metrics={metrics}
-                      trackHeight={trackHeight}
-                      editable={canEditMeetings}
-                      disabled={busy}
-                      busySlots={busySlots}
-                      onUpdateBusySlots={(nextBusySlots) =>
-                        onUpdateBusySlots?.(date, member.userId, nextBusySlots)
-                      }
-                      onEdit={() =>
-                        openMeetingEditor(member.userId, member.displayName, index, busySlot)
-                      }
-                    />
-                  ))}
-                </div>
+              <div
+                className="day-watch-cell"
+                ref={rowIndex === 0 ? watchColumnRef : undefined}
+              >
+                {slot
+                  ? renderSlotCell({
+                      date,
+                      slot,
+                      memberIds,
+                      disabled: busy,
+                      onClick: () => onEditSlot(date, slot),
+                    })
+                  : null}
               </div>
-            );
-          })}
-        </div>
+              <div className="day-watch-divider day-watch-divider-body" aria-hidden="true" />
+              {rowIndex === 0
+                ? members.map((member, memberIndex) => {
+                    const busySlots = getMemberBusySlots(member.userId, date, householdUploads);
+                    const accent = memberColor(member.userId, memberIds);
+
+                    return (
+                      <div
+                        className="day-meetings-column"
+                        key={member.userId}
+                        style={{
+                          gridRow: `3 / span ${timeSlots.length}`,
+                          gridColumn: 4 + memberIndex,
+                        }}
+                      >
+                        <div
+                          ref={memberIndex === 0 ? meetingsTrackRef : undefined}
+                          className={`day-meetings-track${canEditMeetings ? ' addable' : ''}`}
+                          onClick={
+                            canEditMeetings
+                              ? (event) =>
+                                  handleTrackClick(event, member.userId, member.displayName)
+                              : undefined
+                          }
+                        >
+                          {busySlots.map((busySlot, index) => (
+                            <MeetingBlock
+                              key={`${busySlot.start}-${busySlot.end}-${index}`}
+                              busySlot={busySlot}
+                              slotIndex={index}
+                              memberUserId={member.userId}
+                              accent={accent}
+                              metrics={metrics}
+                              trackHeight={trackHeight}
+                              editable={canEditMeetings}
+                              disabled={busy}
+                              busySlots={busySlots}
+                              onUpdateBusySlots={(nextBusySlots) =>
+                                onUpdateBusySlots?.(date, member.userId, nextBusySlots)
+                              }
+                              onEdit={() =>
+                                openMeetingEditor(member.userId, member.displayName, index, busySlot)
+                              }
+                            />
+                          ))}
+                        </div>
+                      </div>
+                    );
+                  })
+                : null}
+            </div>
+          );
+        })}
       </div>
 
       <DayNowLine
@@ -874,7 +879,7 @@ export function DayScheduleBoard({
         boardRef={boardRef}
         slotsStartRef={slotsStartRef}
         slotsEndRef={slotsEndRef}
-        trackRef={meetingsTrackRef}
+        trackRef={watchColumnRef}
       />
 
       {meetingForm ? (

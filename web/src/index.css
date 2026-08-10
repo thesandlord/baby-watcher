@@ -93,6 +93,39 @@ button {
   padding: 1rem 1rem 6rem;
 }
 
+.app-shell--schedule {
+  height: 100dvh;
+  max-height: 100dvh;
+  min-height: 0;
+  padding: 1rem;
+  padding-bottom: max(1rem, env(safe-area-inset-bottom));
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.schedule-view {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.schedule-view .schedule-header,
+.schedule-view .on-watch-banner,
+.schedule-view .error-banner {
+  flex-shrink: 0;
+}
+
+.schedule-scroll-area {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
 .top-bar {
   display: flex;
   align-items: center;
@@ -253,6 +286,30 @@ button {
   background: var(--warning-soft);
   color: var(--text);
   border: 1px solid var(--border);
+}
+
+.on-watch-banner {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.65rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.75rem;
+  padding: 0.85rem 1rem;
+  border-radius: 0.95rem;
+  background: color-mix(in srgb, var(--banner-accent, var(--accent)) 14%, var(--surface-strong));
+  border: 1px solid color-mix(in srgb, var(--banner-accent, var(--accent)) 28%, transparent);
+  border-left: 4px solid var(--banner-accent, var(--accent));
+}
+
+.on-watch-banner strong {
+  font-weight: 800;
+}
+
+.on-watch-banner span {
+  color: var(--text-muted);
+  font-size: 0.92rem;
+  font-variant-numeric: tabular-nums;
 }
 
 .processing-panel {
@@ -489,7 +546,9 @@ button {
 }
 
 .week-scroll {
-  overflow-x: auto;
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
   border: 1px solid var(--border);
   border-radius: 1.2rem;
   background: var(--surface);
@@ -504,6 +563,7 @@ button {
   display: grid;
   grid-template-columns: 4.8rem repeat(var(--day-count, 5), minmax(175px, 1fr));
   min-width: max(640px, calc(4.8rem + var(--day-count, 5) * 175px));
+  --week-head-height: 4.4rem;
 }
 
 .week-grid-row {
@@ -665,12 +725,16 @@ button {
   min-height: 4rem;
   padding: 0.55rem;
   background: var(--surface-strong);
+  position: sticky;
+  top: var(--week-head-height);
+  z-index: 3;
 }
 
 .week-footer-label {
   position: sticky;
   left: 0;
-  z-index: 2;
+  top: var(--week-head-height);
+  z-index: 4;
   display: grid;
   place-items: center;
   color: var(--text-muted);
@@ -767,36 +831,58 @@ button {
 
 .day-board-wrapper {
   position: relative;
-  overflow-x: auto;
 }
 
 .day-board {
   display: grid;
-  grid-template-rows: auto auto 1fr;
+  grid-template-columns: 4.8rem minmax(160px, 1.15fr) 4px repeat(var(--member-count, 1), minmax(120px, 1fr));
   min-width: min(100%, 960px);
   --slot-height: 3rem;
+  --day-head-height: 4rem;
 }
 
 .day-board-header,
 .day-board-actions,
-.day-board-body {
-  display: grid;
-  grid-template-columns: 4.8rem minmax(160px, 1.15fr) 4px repeat(var(--member-count, 1), minmax(120px, 1fr));
+.day-board-slot-row {
+  display: contents;
 }
 
-.day-board-header {
+.day-corner,
+.day-watch-header,
+.day-watch-divider,
+.day-member-header,
+.day-actions-label,
+.day-watch-actions,
+.day-member-action {
+  background: var(--surface-strong);
+}
+
+.day-corner,
+.day-watch-header,
+.day-watch-divider,
+.day-member-header {
   position: sticky;
   top: 0;
   z-index: 4;
 }
 
-.day-corner,
-.day-actions-label,
-.day-time-column {
-  position: sticky;
+.day-corner {
   left: 0;
-  z-index: 3;
-  background: var(--surface-strong);
+  z-index: 6;
+}
+
+.day-actions-label,
+.day-watch-actions,
+.day-board-actions .day-watch-divider,
+.day-member-action {
+  position: sticky;
+  top: var(--day-head-height);
+  z-index: 4;
+}
+
+.day-actions-label {
+  left: 0;
+  z-index: 5;
 }
 
 .day-corner,
@@ -844,7 +930,8 @@ button {
 }
 
 .day-watch-divider-body {
-  min-height: 100%;
+  height: var(--slot-height);
+  border-bottom: 1px solid var(--border);
 }
 
 .day-board-actions {
@@ -853,10 +940,8 @@ button {
 
 .day-actions-label,
 .day-member-action,
-.day-member-action-spacer,
 .day-watch-actions {
   min-height: 4rem;
-  background: var(--surface-strong);
 }
 
 .day-member-action {
@@ -893,22 +978,19 @@ button {
   padding: 0.55rem;
 }
 
-.day-board-body {
-  align-items: stretch;
-}
-
-.day-time-column {
-  border-right: 1px solid var(--border);
-}
-
 .day-time-label {
+  position: sticky;
+  left: 0;
+  z-index: 2;
   box-sizing: border-box;
   height: var(--slot-height);
   min-height: var(--slot-height);
   max-height: var(--slot-height);
   padding: 0.35rem 0.5rem 0;
   color: var(--text-muted);
+  border-right: 1px solid var(--border);
   border-bottom: 1px solid var(--border);
+  background: var(--surface-strong);
   font-size: 0.72rem;
   text-align: right;
   font-variant-numeric: tabular-nums;
@@ -1011,16 +1093,13 @@ button {
   white-space: nowrap;
 }
 
-.day-watch-column {
-  border-left: 1px solid var(--border);
-}
-
 .day-watch-cell {
   box-sizing: border-box;
   height: var(--slot-height);
   min-height: var(--slot-height);
   max-height: var(--slot-height);
   padding: 0.18rem;
+  border-left: 1px solid var(--border);
   border-bottom: 1px solid var(--border);
   overflow: hidden;
 }

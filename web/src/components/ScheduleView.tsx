@@ -20,6 +20,7 @@ import {
 } from '@baby-watcher/shared';
 import { memberColor, memberInitials } from '../lib/members';
 import {
+  activeWatchSlotAtNow,
   currentTimeLineFraction,
   formatCalendarDate,
   formatDisplayDate,
@@ -156,6 +157,8 @@ export function ScheduleView({
   const today = todayIsoDate();
   const nowLineFraction = currentTimeLineFraction(now, WORKDAY_START, WORKDAY_END);
   const showNowLine = viewDates.includes(today) && nowLineFraction !== null;
+  const activeWatchSlot = activeWatchSlotAtNow(schedules[today]?.slots ?? [], now);
+  const isOnWatch = activeWatchSlot?.watcherId === profile.uid;
 
   useEffect(() => {
     const intervalId = window.setInterval(() => setNow(new Date()), 60_000);
@@ -178,7 +181,7 @@ export function ScheduleView({
   const viewHeading = formatViewHeading(viewDates);
 
   return (
-    <>
+    <div className="schedule-view">
       <div className={`schedule-header week-toolbar${viewHeading ? '' : ' week-toolbar-compact'}`}>
         {viewHeading ? (
           <div className="schedule-meta">
@@ -241,10 +244,29 @@ export function ScheduleView({
         </div>
       </div>
 
+      {isOnWatch && activeWatchSlot ? (
+        <div
+          className="on-watch-banner"
+          role="status"
+          data-testid="on-watch-banner"
+          style={
+            {
+              '--banner-accent': memberColor(profile.uid, memberIds),
+            } as CSSProperties
+          }
+        >
+          <strong>You&apos;re on watch</strong>
+          <span>
+            {formatSlotTime(activeWatchSlot.start)} – {formatSlotTime(activeWatchSlot.end)}
+          </span>
+        </div>
+      ) : null}
+
       {error ? <div className="error-banner">{error}</div> : null}
 
-      <DndContext sensors={sensors} onDragEnd={handleDragEnd}>
-        <div className="week-scroll">
+      <div className="schedule-scroll-area">
+        <DndContext sensors={sensors} onDragEnd={handleDragEnd}>
+          <div className="week-scroll">
           {viewMode === 'day' ? (
             <DayScheduleBoard
               date={activeDate}
@@ -376,6 +398,7 @@ export function ScheduleView({
           ) : null}
         </div>
       </DndContext>
+      </div>
 
       <HouseholdMenu
         profile={profile}
@@ -484,6 +507,6 @@ export function ScheduleView({
           </div>
         </div>
       ) : null}
-    </>
+    </div>
   );
 }

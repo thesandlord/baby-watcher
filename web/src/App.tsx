@@ -306,7 +306,7 @@ function AppContent() {
   }
 
   return (
-    <div className="app-shell" data-testid="app-shell" data-busy={busy}>
+    <div className="app-shell app-shell--schedule" data-testid="app-shell" data-busy={busy}>
       <ScheduleView
         profile={profile}
         schedules={schedules}
