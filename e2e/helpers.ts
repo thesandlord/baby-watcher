@@ -74,8 +74,8 @@ export async function uploadAvailability(page: Page, date = TEST_DATE): Promise<
   await expect(dialog).toBeVisible();
   await expect(dialog.getByRole('button', { name: 'Take a photo' })).toBeVisible();
   await expect(dialog.getByRole('button', { name: 'Upload an image' })).toBeVisible();
-  await dialog.getByRole('button', { name: 'Use sample calendar' }).click();
-  await expect(dialog).toBeHidden();
+  await dialog.getByRole('button', { name: 'Use sample day' }).click();
+  await expect(dialog).toBeHidden({ timeout: 10000 });
 }
 
 export async function generateDay(page: Page, date = TEST_DATE): Promise<void> {

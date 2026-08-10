@@ -91,6 +91,27 @@ export function formatSlotTime(time: string): string {
   });
 }
 
+/** Returns 0–1 position through the workday, or null if outside the range. */
+export function currentTimeLineFraction(
+  now = new Date(),
+  start = '08:00',
+  end = '17:00'
+): number | null {
+  const toMinutes = (time: string) => {
+    const [hours, minutes] = time.split(':').map(Number);
+    return hours * 60 + minutes;
+  };
+  const startMinutes = toMinutes(start);
+  const endMinutes = toMinutes(end);
+  const nowMinutes = now.getHours() * 60 + now.getMinutes() + now.getSeconds() / 60;
+
+  if (nowMinutes < startMinutes || nowMinutes > endMinutes) {
+    return null;
+  }
+
+  return (nowMinutes - startMinutes) / (endMinutes - startMinutes);
+}
+
 export async function fileToBase64(file: File): Promise<string> {
   const buffer = await file.arrayBuffer();
   const bytes = new Uint8Array(buffer);
