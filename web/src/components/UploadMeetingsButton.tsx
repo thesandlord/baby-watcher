@@ -29,9 +29,7 @@ export function UploadMeetingsButton({
 
   function resetModal() {
     setOpen(false);
-    if (previewUrl) {
-      URL.revokeObjectURL(previewUrl);
-    }
+    if (previewUrl) URL.revokeObjectURL(previewUrl);
     setPreviewUrl(null);
     setSelectedFile(null);
     setNeedsDateConfirmation(false);
@@ -46,50 +44,30 @@ export function UploadMeetingsButton({
 
   function handleFileChange(event: React.ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
-    if (!file) {
-      return;
-    }
-
+    if (!file) return;
     setSelectedFile(file);
-    if (previewUrl) {
-      URL.revokeObjectURL(previewUrl);
-    }
+    if (previewUrl) URL.revokeObjectURL(previewUrl);
     setPreviewUrl(URL.createObjectURL(file));
     event.target.value = '';
   }
 
   async function processUpload(dateOverride?: string) {
-    if (!profile.household) {
-      return;
-    }
-
-    if (!mockMode && !selectedFile) {
-      return;
-    }
-
+    if (!profile.household || (!mockMode && !selectedFile)) return;
     setBusy(true);
     onError(null);
-
     try {
-      const imageBase64 = selectedFile
-        ? await fileToBase64(selectedFile)
-        : 'mock-calendar-image';
+      const imageBase64 = selectedFile ? await fileToBase64(selectedFile) : 'mock-calendar-image';
       const extraction = await extractCalendarFromImage(
         imageBase64,
         selectedFile?.type || 'image/jpeg',
         dateOverride
       );
-
       if (extraction.needsDateConfirmation && !dateOverride) {
         setNeedsDateConfirmation(true);
         return;
       }
-
       const date = extraction.date ?? dateOverride;
-      if (!date) {
-        throw new Error('Could not determine the calendar date. Please provide one.');
-      }
-
+      if (!date) throw new Error('Could not determine the calendar date. Please provide one.');
       await saveAvailability(
         profile.household.id,
         date,
@@ -97,7 +75,6 @@ export function UploadMeetingsButton({
         extraction.busySlots,
         extraction.confidence
       );
-
       await onUploaded();
       resetModal();
     } catch (err) {
@@ -111,12 +88,12 @@ export function UploadMeetingsButton({
     <>
       <button
         type="button"
-        className="schedule-badge upload-meetings-button"
+        className="icon-button upload-meetings-button"
+        aria-label="Upload meetings"
         onClick={openUploadModal}
       >
-        Upload meetings
+        +
       </button>
-
       <input
         ref={cameraInputRef}
         type="file"
@@ -132,7 +109,6 @@ export function UploadMeetingsButton({
         hidden
         onChange={handleFileChange}
       />
-
       {open ? (
         <div className="modal-backdrop" role="presentation" onClick={resetModal}>
           <div
@@ -148,17 +124,14 @@ export function UploadMeetingsButton({
             <p className="hero-subtitle">
               We&apos;ll save your busy times. Generate that day when you&apos;re ready.
             </p>
-
             {mockMode && !previewUrl ? (
               <div className="info-banner">
                 Local mock mode: sample busy slots will be used for this upload.
               </div>
             ) : null}
-
             {previewUrl ? (
               <img src={previewUrl} alt="Calendar preview" className="preview-image" />
             ) : null}
-
             {!selectedFile ? (
               <div className="upload-source-options">
                 <button

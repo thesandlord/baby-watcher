@@ -32,7 +32,7 @@ import { ThemeProvider } from './lib/theme';
 import { LoginScreen } from './components/LoginScreen';
 import { OnboardingScreen } from './components/OnboardingScreen';
 import { ScheduleView } from './components/ScheduleView';
-import { UploadMeetingsButton } from './components/FloatingCameraButton';
+import { UploadMeetingsButton } from './components/UploadMeetingsButton';
 
 function defaultWeekdayDate(): string {
   const today = todayIsoDate();

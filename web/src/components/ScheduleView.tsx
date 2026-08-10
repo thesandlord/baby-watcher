@@ -144,7 +144,6 @@ export function ScheduleView({
     <>
       <div className="schedule-header week-toolbar">
         <div className="schedule-meta">
-          {uploadMeetingsButton}
           <h1 className="hero-title">{formatWeekRange(weekDates)}</h1>
         </div>
         <div className="week-toolbar-actions">
@@ -157,6 +156,7 @@ export function ScheduleView({
           <button type="button" className="icon-button" onClick={onNextWeek} aria-label="Next week">
             ›
           </button>
+          {uploadMeetingsButton}
           <button
             type="button"
             className="icon-button menu-button"
@@ -169,15 +169,6 @@ export function ScheduleView({
       </div>
 
       {error ? <div className="error-banner">{error}</div> : null}
-
-      <div className="member-legend" aria-label="Household member colors">
-        {profile.household?.members.map((member) => (
-          <span key={member.userId} className="member-pill">
-            <span className="legend-dot" style={{ background: memberColor(member.userId, memberIds) }} />
-            {member.displayName}
-          </span>
-        ))}
-      </div>
 
       <DndContext sensors={sensors} onDragEnd={handleDragEnd}>
         <div className="week-scroll">

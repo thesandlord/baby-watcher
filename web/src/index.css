@@ -267,12 +267,14 @@ button {
 
 .week-toolbar {
   align-items: center;
+  margin-bottom: 0.65rem;
 }
 
 .week-toolbar-actions {
   display: flex;
   align-items: center;
   gap: 0.4rem;
+  flex: 0 0 auto;
 }
 
 .today-button {
@@ -302,8 +304,7 @@ button {
 }
 
 .schedule-meta {
-  display: grid;
-  gap: 0.35rem;
+  min-width: 0;
 }
 
 .schedule-badge {
@@ -320,7 +321,8 @@ button {
 }
 
 .upload-meetings-button {
-  border: none;
+  font-size: 1.65rem;
+  line-height: 1;
 }
 
 .control-grid {
@@ -616,9 +618,9 @@ button {
 
 .week-day-action {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-rows: auto auto;
   gap: 0.35rem;
-  align-items: center;
+  justify-items: stretch;
   border-left: 1px solid var(--border);
 }
 
@@ -629,6 +631,7 @@ button {
 }
 
 .upload-status-button {
+  width: 100%;
   border: 1px solid var(--border);
   border-radius: 999px;
   padding: 0.55rem 0.45rem;
@@ -862,25 +865,15 @@ button {
   }
 
   .week-toolbar {
-    align-items: flex-start;
-  }
-
-  .week-toolbar-actions {
-    display: grid;
-    grid-template-columns: repeat(4, auto);
+    gap: 0.45rem;
   }
 
   .today-button {
-    grid-column: 1 / -1;
     padding: 0.45rem 0.75rem;
   }
 
-  .member-legend {
-    flex-wrap: nowrap;
-    overflow-x: auto;
-  }
-
-  .member-legend .member-pill {
-    flex: 0 0 auto;
+  .week-toolbar .hero-title {
+    font-size: 1.3rem;
+    white-space: nowrap;
   }
 }
