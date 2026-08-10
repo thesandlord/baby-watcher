@@ -159,39 +159,3 @@ export async function overrideSlot(
 export async function waitForAppIdle(page: Page): Promise<void> {
   await expect(page.getByTestId('app-shell')).toHaveAttribute('data-busy', 'false');
 }
-
-export async function dragSlot(
-  page: Page,
-  source: { date: string; start: string },
-  target: { date: string; start: string }
-): Promise<void> {
-  if (source.date !== target.date) {
-    await switchToThreeDayView(page);
-  }
-  await goToDate(page, source.date);
-  const sourceSlot = page.getByTestId(`slot-${source.date}-${source.start}`);
-  const targetSlot = page.getByTestId(`slot-${target.date}-${target.start}`);
-  const sourceBox = await sourceSlot.boundingBox();
-  const targetBox = await targetSlot.boundingBox();
-  if (!sourceBox || !targetBox) {
-    throw new Error('Cannot drag slots that are outside the viewport.');
-  }
-
-  await page.mouse.move(
-    sourceBox.x + sourceBox.width / 2,
-    sourceBox.y + sourceBox.height / 2
-  );
-  await page.mouse.down();
-  await page.mouse.move(
-    sourceBox.x + sourceBox.width / 2 + 12,
-    sourceBox.y + sourceBox.height / 2,
-    { steps: 4 }
-  );
-  await page.mouse.move(
-    targetBox.x + targetBox.width / 2,
-    targetBox.y + targetBox.height / 2,
-    { steps: 12 }
-  );
-  await page.mouse.up();
-  await waitForAppIdle(page);
-}
