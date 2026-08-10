@@ -77,9 +77,12 @@ function AppContent() {
         return;
       }
 
+      setLoading(true);
+      setError(null);
       try {
-        setProfile(await getProfile());
+        setProfile(await getProfile(nextUser.uid));
       } catch (err) {
+        setProfile(null);
         setError(err instanceof Error ? err.message : 'Failed to load profile.');
       } finally {
         setLoading(false);
@@ -280,7 +283,10 @@ function AppContent() {
   }
 
   async function refreshProfile() {
-    const nextProfile = await getProfile();
+    if (!user) {
+      return;
+    }
+    const nextProfile = await getProfile(user.uid);
     setProfile(nextProfile);
   }
 
@@ -303,7 +309,7 @@ function AppContent() {
   }
 
   if (!profile?.household) {
-    return <OnboardingScreen onComplete={refreshProfile} />;
+    return <OnboardingScreen onComplete={refreshProfile} loadError={error} />;
   }
 
   const canEditSchedule = !isViewerProfile(profile);
