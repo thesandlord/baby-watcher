@@ -21,7 +21,7 @@ import {
   subscribeSchedulesForDates,
   swapScheduleAssignments,
   updateScheduleAssignment,
-  updateAvailabilityBusySlots,
+  upsertMemberAvailabilityBusySlots,
   type UploadedAvailability,
 } from './lib/firestore-api';
 import {
@@ -205,14 +205,25 @@ function AppContent() {
     }
   }
 
-  async function handleUpdateBusySlots(date: string, busySlots: UploadedAvailability['busySlots']) {
+  async function handleUpdateBusySlots(
+    date: string,
+    userId: string,
+    busySlots: UploadedAvailability['busySlots']
+  ) {
     if (!profile?.household) {
       return;
     }
     setBusy(true);
     setError(null);
     try {
-      await updateAvailabilityBusySlots(profile.household.id, date, busySlots);
+      const member = profile.household.members.find((entry) => entry.userId === userId);
+      await upsertMemberAvailabilityBusySlots(
+        profile.household.id,
+        date,
+        userId,
+        member?.displayName ?? userId,
+        busySlots
+      );
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to update meeting times.');
     } finally {
@@ -323,7 +334,7 @@ function AppContent() {
           void handleSwap(sourceDate, sourceStart, targetDate, targetStart);
         }}
         onAssign={(date, start, watcherId) => void handleAssign(date, start, watcherId)}
-        onUpdateBusySlots={(date, busySlots) => void handleUpdateBusySlots(date, busySlots)}
+        onUpdateBusySlots={(date, userId, busySlots) => void handleUpdateBusySlots(date, userId, busySlots)}
         onDeleteUpload={(date) => void handleDeleteUpload(date)}
         onCleanupOldUploads={() => void handleCleanupOldUploads()}
         onSignOut={() => void signOut(auth)}

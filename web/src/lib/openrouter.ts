@@ -19,7 +19,7 @@ For a SINGLE-DAY calendar view, use this shape:
   "isWeekView": false,
   "date": "YYYY-MM-DD or null if unclear",
   "busySlots": [
-    { "start": "HH:mm", "end": "HH:mm", "title": "optional event name" }
+    { "start": "HH:mm", "end": "HH:mm", "title": "optional event name", "durationMinutes": 30 }
   ],
   "needsDateConfirmation": true/false,
   "confidence": "high" | "medium" | "low"
@@ -50,7 +50,11 @@ Rules:
 - For week views, extract busy slots separately for each visible weekday (Mon–Fri when possible).
 - If the calendar day or week is unclear, set date/weekStart to null and needsDateConfirmation to true.
 - Only include events that overlap 08:00-17:00 Pacific Time when possible.
-- Align each event's start and end to the time grid lines shown in the screenshot — do not round to the nearest half hour.
+- Read each event's exact start AND end from the calendar grid lines. Do NOT assume meetings are 1 hour long.
+- Many meetings are 15, 25, 30, 45, or 50 minutes — use the visible end time, not a default 60-minute block.
+- Examples: a 30-minute meeting at 9:00 must be {"start":"09:00","end":"09:30"}, NOT {"start":"09:00","end":"10:00"}.
+- When end time is unclear but duration is visible, set durationMinutes (e.g. 30) and still provide your best start/end.
+- Snap start and end to 15-minute increments (e.g. :00, :15, :30, :45), but preserve the actual duration shown.
 - If no busy slots are visible for a day, include that day with an empty busySlots array.
 - Prefer isWeekView true when the screenshot clearly shows multiple days at once.`;
 
@@ -152,10 +156,11 @@ function mockCalendarExtraction(options?: {
         date,
         busySlots: index % 2 === 0
           ? [
-              { start: '09:00', end: '11:00', title: 'Team meetings' },
+              { start: '09:00', end: '09:30', title: 'Standup' },
+              { start: '10:00', end: '11:00', title: 'Team meetings' },
               { start: '13:00', end: '14:30', title: 'Focus block' },
             ]
-          : [{ start: '10:30', end: '12:00', title: 'Client call' }],
+          : [{ start: '10:30', end: '11:00', title: 'Client call' }],
         confidence: 'high' as const,
       })),
       needsDateConfirmation: false,
@@ -173,7 +178,8 @@ function mockCalendarExtraction(options?: {
     isWeekView: false,
     date,
     busySlots: [
-      { start: '09:00', end: '11:00', title: 'Team meetings' },
+      { start: '09:00', end: '09:30', title: 'Standup' },
+      { start: '10:00', end: '11:00', title: 'Team meetings' },
       { start: '13:00', end: '14:30', title: 'Focus block' },
     ],
     needsDateConfirmation: false,
@@ -239,15 +245,39 @@ function extractJson(raw: string): string {
   return raw.trim();
 }
 
-function normalizeBusySlots(slots: BusySlot[]): BusySlot[] {
+function addMinutesToTime(time: string, minutes: number): string {
+  const [hours, mins] = time.split(':').map(Number);
+  const total = hours * 60 + mins + minutes;
+  const nextHours = Math.floor(total / 60);
+  const nextMinutes = total % 60;
+  return `${String(nextHours).padStart(2, '0')}:${String(nextMinutes).padStart(2, '0')}`;
+}
+
+function normalizeBusySlots(
+  slots: Array<BusySlot & { durationMinutes?: number }>
+): BusySlot[] {
   const normalized: BusySlot[] = [];
 
   for (const slot of slots) {
     const start = parseWallClockTime(slot.start);
-    const end = parseWallClockTime(slot.end);
-    if (!start || !end || start >= end) {
+    if (!start) {
       continue;
     }
+
+    let end = parseWallClockTime(slot.end);
+    const durationMinutes =
+      typeof slot.durationMinutes === 'number' && slot.durationMinutes > 0
+        ? slot.durationMinutes
+        : null;
+
+    if (durationMinutes && (!end || end <= start)) {
+      end = addMinutesToTime(start, durationMinutes);
+    }
+
+    if (!end || start >= end) {
+      continue;
+    }
+
     normalized.push({
       start,
       end,
