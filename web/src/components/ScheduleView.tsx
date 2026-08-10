@@ -165,6 +165,9 @@ export function ScheduleView({
   const showNowLine = viewDates.includes(today) && nowLineFraction !== null;
   const activeWatchSlot = activeWatchSlotAtNow(schedules[today]?.slots ?? [], now);
   const isOnWatch = activeWatchSlot?.watcherId === profile.uid;
+  const onWatchAccent = activeWatchSlot?.watcherId
+    ? memberColor(activeWatchSlot.watcherId, memberIds)
+    : 'var(--text-muted)';
 
   useEffect(() => {
     setNow(new Date());
@@ -251,18 +254,25 @@ export function ScheduleView({
         </div>
       </div>
 
-      {isOnWatch && activeWatchSlot ? (
+      {activeWatchSlot ? (
         <div
-          className="on-watch-banner"
+          className={`on-watch-banner${isOnWatch ? ' on-watch-banner-self' : ''}`}
           role="status"
           data-testid="on-watch-banner"
+          data-on-watch-self={isOnWatch ? 'true' : 'false'}
           style={
             {
-              '--banner-accent': memberColor(profile.uid, memberIds),
+              '--banner-accent': onWatchAccent,
             } as CSSProperties
           }
         >
-          <strong>You&apos;re on watch</strong>
+          <strong>
+            {isOnWatch
+              ? 'You\u2019re on watch'
+              : activeWatchSlot.watcherName
+                ? `${activeWatchSlot.watcherName} is on watch`
+                : 'No one is on watch'}
+          </strong>
           <span>
             {formatSlotTime(activeWatchSlot.start)} – {formatSlotTime(activeWatchSlot.end)}
           </span>

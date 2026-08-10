@@ -297,9 +297,29 @@ button {
   margin-bottom: 0.75rem;
   padding: 0.85rem 1rem;
   border-radius: 0.95rem;
-  background: color-mix(in srgb, var(--banner-accent, var(--accent)) 14%, var(--surface-strong));
-  border: 1px solid color-mix(in srgb, var(--banner-accent, var(--accent)) 28%, transparent);
+  background: color-mix(in srgb, var(--banner-accent, var(--accent)) 10%, var(--surface-strong));
+  border: 1px solid color-mix(in srgb, var(--banner-accent, var(--accent)) 22%, transparent);
   border-left: 4px solid var(--banner-accent, var(--accent));
+}
+
+.on-watch-banner-self {
+  padding: 1rem 1.15rem;
+  background: color-mix(in srgb, var(--banner-accent, var(--accent)) 24%, var(--surface-strong));
+  border: 1px solid color-mix(in srgb, var(--banner-accent, var(--accent)) 45%, transparent);
+  border-left-width: 5px;
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--banner-accent, var(--accent)) 18%, transparent),
+    var(--shadow-soft);
+}
+
+.on-watch-banner-self strong {
+  color: var(--text);
+  font-size: 1.02rem;
+}
+
+.on-watch-banner-self span {
+  color: var(--text);
+  font-weight: 600;
 }
 
 .on-watch-banner strong {
