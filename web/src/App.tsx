@@ -14,6 +14,7 @@ import {
   getProfile,
   getSchedule,
   getSchedulesForDates,
+  listAvailabilityForDates,
   listMyAvailability,
   regenerateSchedule,
   swapScheduleAssignments,
@@ -31,7 +32,7 @@ import { ThemeProvider } from './lib/theme';
 import { LoginScreen } from './components/LoginScreen';
 import { OnboardingScreen } from './components/OnboardingScreen';
 import { ScheduleView } from './components/ScheduleView';
-import { FloatingCameraButton } from './components/FloatingCameraButton';
+import { UploadMeetingsButton } from './components/FloatingCameraButton';
 
 function defaultWeekdayDate(): string {
   const today = todayIsoDate();
@@ -46,6 +47,7 @@ function AppContent() {
   const [weekStart, setWeekStart] = useState(() => mondayOfWeek(defaultWeekdayDate()));
   const [schedules, setSchedules] = useState<Record<string, DaySchedule | null>>({});
   const [uploads, setUploads] = useState<UploadedAvailability[]>([]);
+  const [householdUploads, setHouseholdUploads] = useState<UploadedAvailability[]>([]);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -59,6 +61,7 @@ function AppContent() {
         setProfile(null);
         setSchedules({});
         setUploads([]);
+        setHouseholdUploads([]);
         setLoading(false);
         return;
       }
@@ -109,7 +112,12 @@ function AppContent() {
       return;
     }
     try {
-      setUploads(await listMyAvailability(profile.household.id));
+      const [myUploads, allUploads] = await Promise.all([
+        listMyAvailability(profile.household.id),
+        listAvailabilityForDates(profile.household.id, weekDates),
+      ]);
+      setUploads(myUploads);
+      setHouseholdUploads(allUploads);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load uploaded schedules.');
     }
@@ -222,6 +230,7 @@ function AppContent() {
     setProfile(nextProfile);
     if (nextProfile?.household) {
       setUploads(await listMyAvailability(nextProfile.household.id));
+      setHouseholdUploads(await listAvailabilityForDates(nextProfile.household.id, weekDates));
       setSchedules(await getSchedulesForDates(nextProfile.household.id, weekDates));
     }
   }
@@ -256,8 +265,20 @@ function AppContent() {
         weekDates={weekDates}
         activeDate={activeDate}
         uploads={uploads}
+        householdUploads={householdUploads}
         busy={busy}
         error={error}
+        uploadMeetingsButton={(
+          <UploadMeetingsButton
+            profile={profile}
+            selectedDate={activeDate}
+            onUploaded={async () => {
+              await loadUploads();
+              await loadWeek();
+            }}
+            onError={setError}
+          />
+        )}
         onActiveDateChange={selectDate}
         onPreviousWeek={() => navigateWeek(-1)}
         onNextWeek={() => navigateWeek(1)}
@@ -269,16 +290,6 @@ function AppContent() {
         onAssign={(date, start, watcherId) => void handleAssign(date, start, watcherId)}
         onDeleteUpload={(date) => void handleDeleteUpload(date)}
         onSignOut={() => void signOut(auth)}
-      />
-
-      <FloatingCameraButton
-        profile={profile}
-        selectedDate={activeDate}
-        onUploaded={async () => {
-          await loadUploads();
-          await loadWeek();
-        }}
-        onError={setError}
       />
     </div>
   );

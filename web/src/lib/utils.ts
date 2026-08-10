@@ -63,13 +63,13 @@ export function formatWeekRange(dates: string[]): string {
   }
   const start = new Date(`${dates[0]}T12:00:00`);
   const finish = new Date(`${dates.at(-1)}T12:00:00`);
+  finish.setDate(finish.getDate() + 1);
   const startLabel = start.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
   const finishLabel = finish.toLocaleDateString(undefined, {
     month: start.getMonth() === finish.getMonth() ? undefined : 'short',
     day: 'numeric',
-    year: 'numeric',
   });
-  return `${startLabel} – ${finishLabel}`;
+  return `${startLabel}-${finishLabel}`;
 }
 
 export function formatDisplayDate(date: string): string {

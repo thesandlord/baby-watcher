@@ -60,9 +60,11 @@ export async function closeProfile(page: Page): Promise<void> {
 
 export async function uploadAvailability(page: Page, date = TEST_DATE): Promise<void> {
   await page.getByTestId(`day-${date}`).click();
-  await page.getByRole('button', { name: 'Upload calendar photo' }).click();
+  await page.getByRole('button', { name: 'Upload meetings' }).click();
   const dialog = page.getByRole('dialog', { name: 'Upload calendar screenshot' });
   await expect(dialog).toBeVisible();
+  await expect(dialog.getByRole('button', { name: 'Take a photo' })).toBeVisible();
+  await expect(dialog.getByRole('button', { name: 'Upload an image' })).toBeVisible();
   await dialog.getByRole('button', { name: 'Use sample calendar' }).click();
   await expect(dialog).toBeHidden();
 }

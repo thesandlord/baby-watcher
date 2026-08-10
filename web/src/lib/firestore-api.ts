@@ -24,6 +24,8 @@ import type { UserProfile } from './utils';
 
 export interface UploadedAvailability {
   date: string;
+  userId: string;
+  displayName: string;
   busySlots: PersonAvailability['busySlots'];
   confidence: string;
   updatedAt: Date | null;
@@ -204,12 +206,43 @@ export async function listMyAvailability(
       const timestamp = data.updatedAt as { toDate?: () => Date } | undefined;
       return {
         date: data.date as string,
+        userId: data.userId as string,
+        displayName: data.displayName as string,
         busySlots: (data.busySlots ?? []) as PersonAvailability['busySlots'],
         confidence: (data.confidence as string) ?? 'unknown',
         updatedAt: timestamp?.toDate?.() ?? null,
       };
     })
     .sort((a, b) => b.date.localeCompare(a.date));
+}
+
+export async function listAvailabilityForDates(
+  householdId: string,
+  dates: string[]
+): Promise<UploadedAvailability[]> {
+  if (dates.length === 0) {
+    return [];
+  }
+
+  const snapshot = await getDocs(
+    query(
+      collection(db, 'households', householdId, 'availability'),
+      where('date', 'in', dates)
+    )
+  );
+
+  return snapshot.docs.map((availabilityDoc) => {
+    const data = availabilityDoc.data();
+    const timestamp = data.updatedAt as { toDate?: () => Date } | undefined;
+    return {
+      date: data.date as string,
+      userId: data.userId as string,
+      displayName: data.displayName as string,
+      busySlots: (data.busySlots ?? []) as PersonAvailability['busySlots'],
+      confidence: (data.confidence as string) ?? 'unknown',
+      updatedAt: timestamp?.toDate?.() ?? null,
+    };
+  });
 }
 
 export async function deleteMyAvailability(householdId: string, date: string): Promise<void> {
