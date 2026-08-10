@@ -2,7 +2,7 @@ import { useRef, useState } from 'react';
 import type { CalendarExtractionResult } from '@baby-watcher/shared';
 import { extractCalendarFromImage } from '../lib/openrouter';
 import { saveAvailability, saveAvailabilityBatch } from '../lib/firestore-api';
-import { fileToBase64, type UserProfile } from '../lib/utils';
+import { fileToBase64, shiftDate, type UserProfile } from '../lib/utils';
 
 const mockMode = import.meta.env.VITE_MOCK_CALENDAR_EXTRACTION === 'true';
 
@@ -401,23 +401,29 @@ function alignWeekDays(
     return { ...extraction, weekStart, needsDateConfirmation: false };
   }
 
-  const offsetMs =
-    new Date(`${weekStart}T12:00:00`).getTime() - new Date(`${firstDate}T12:00:00`).getTime();
-  const offsetDays = Math.round(offsetMs / (24 * 60 * 60 * 1000));
+  const offsetDays = calendarDaysBetween(firstDate, weekStart);
 
   return {
     ...extraction,
     weekStart,
     needsDateConfirmation: false,
-    days: sorted.map((day) => {
-      const shifted = shiftIsoDate(day.date, offsetDays);
-      return { ...day, date: shifted };
-    }),
+    days: sorted.map((day) => ({
+      ...day,
+      date: shiftDate(day.date, offsetDays),
+    })),
   };
 }
 
-function shiftIsoDate(date: string, days: number): string {
-  const next = new Date(`${date}T12:00:00`);
-  next.setDate(next.getDate() + days);
-  return `${next.getFullYear()}-${String(next.getMonth() + 1).padStart(2, '0')}-${String(next.getDate()).padStart(2, '0')}`;
+function calendarDaysBetween(from: string, to: string): number {
+  if (from === to) {
+    return 0;
+  }
+  const direction = from < to ? 1 : -1;
+  let current = from;
+  let offset = 0;
+  while (current !== to && Math.abs(offset) < 366) {
+    current = shiftDate(current, direction);
+    offset += direction;
+  }
+  return offset;
 }

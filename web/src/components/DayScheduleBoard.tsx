@@ -2,6 +2,7 @@ import { useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode, 
 import {
   WORKDAY_END,
   WORKDAY_START,
+  SLOT_MINUTES,
   type BusySlot,
   type DaySchedule,
   type ScheduleSlot,
@@ -9,6 +10,7 @@ import {
 import { memberColor, memberInitials } from '../lib/members';
 import {
   formatDisplayDate,
+  formatShortDate,
   formatSlotTime,
   type UserProfile,
 } from '../lib/utils';
@@ -29,6 +31,8 @@ interface DayScheduleBoardProps {
   onGenerate: (date: string) => void;
   onUploadStatus: (date: string) => void;
   onEditSlot: (date: string, slot: ScheduleSlot) => void;
+  onUpdateBusySlots?: (date: string, busySlots: BusySlot[]) => void;
+  currentUserId: string;
   renderSlotCell: (props: {
     date: string;
     slot: ScheduleSlot;
@@ -79,6 +83,160 @@ function getMemberBusySlots(
   return (
     householdUploads.find((upload) => upload.date === date && upload.userId === userId)
       ?.busySlots ?? []
+  );
+}
+
+function minutesToTime(totalMinutes: number): string {
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+  return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
+}
+
+function snapMinutes(minutes: number, grid = SLOT_MINUTES): number {
+  return Math.round(minutes / grid) * grid;
+}
+
+function shiftBusySlot(
+  busySlot: BusySlot,
+  deltaMinutes: number,
+  metrics: ReturnType<typeof workdayMetrics>
+): BusySlot {
+  const duration = timeToMinutes(busySlot.end) - timeToMinutes(busySlot.start);
+  let nextStart = snapMinutes(timeToMinutes(busySlot.start) + deltaMinutes);
+  let nextEnd = nextStart + duration;
+
+  if (nextStart < metrics.startMinutes) {
+    nextStart = metrics.startMinutes;
+    nextEnd = nextStart + duration;
+  }
+  if (nextEnd > metrics.endMinutes) {
+    nextEnd = metrics.endMinutes;
+    nextStart = nextEnd - duration;
+  }
+
+  return {
+    ...busySlot,
+    start: minutesToTime(nextStart),
+    end: minutesToTime(nextEnd),
+  };
+}
+
+interface MeetingBlockProps {
+  busySlot: BusySlot;
+  slotIndex: number;
+  memberUserId: string;
+  accent: string;
+  metrics: ReturnType<typeof workdayMetrics>;
+  trackHeight: number;
+  editable: boolean;
+  disabled: boolean;
+  busySlots: BusySlot[];
+  onUpdateBusySlots: (busySlots: BusySlot[]) => void;
+}
+
+function MeetingBlock({
+  busySlot,
+  slotIndex,
+  memberUserId,
+  accent,
+  metrics,
+  trackHeight,
+  editable,
+  disabled,
+  busySlots,
+  onUpdateBusySlots,
+}: MeetingBlockProps) {
+  const [dragOffsetY, setDragOffsetY] = useState(0);
+  const [dragging, setDragging] = useState(false);
+  const startClientYRef = useRef(0);
+  const draggingRef = useRef(false);
+
+  function finishDrag(deltaY: number) {
+    if (!editable || disabled || trackHeight <= 0 || deltaY === 0) {
+      return;
+    }
+
+    const deltaMinutes = (deltaY / trackHeight) * metrics.totalMinutes;
+    const nextSlot = shiftBusySlot(busySlot, deltaMinutes, metrics);
+    if (nextSlot.start === busySlot.start && nextSlot.end === busySlot.end) {
+      return;
+    }
+
+    const nextBusySlots = busySlots.map((slot, index) => (index === slotIndex ? nextSlot : slot));
+    onUpdateBusySlots(nextBusySlots);
+  }
+
+  const blockStyle = meetingBlockStyle(busySlot, metrics);
+  if (blockStyle.display === 'none') {
+    return null;
+  }
+
+  return (
+    <div
+      className={`day-meeting-block${editable ? ' draggable' : ''}${dragging ? ' dragging' : ''}`}
+      data-testid={`meeting-${memberUserId}-${busySlot.start}`}
+      style={{
+        ...blockStyle,
+        '--meeting-accent': accent,
+        transform: dragOffsetY ? `translateY(${dragOffsetY}px)` : undefined,
+      } as CSSProperties}
+      title={
+        busySlot.title
+          ? `${busySlot.start}–${busySlot.end} · ${busySlot.title}`
+          : `${busySlot.start}–${busySlot.end}`
+      }
+      onPointerDown={
+        editable && !disabled
+          ? (event) => {
+              event.currentTarget.setPointerCapture(event.pointerId);
+              startClientYRef.current = event.clientY;
+              draggingRef.current = true;
+              setDragging(true);
+              setDragOffsetY(0);
+            }
+          : undefined
+      }
+      onPointerMove={
+        editable && !disabled
+          ? (event) => {
+              if (!draggingRef.current) {
+                return;
+              }
+              setDragOffsetY(event.clientY - startClientYRef.current);
+            }
+          : undefined
+      }
+      onPointerUp={
+        editable && !disabled
+          ? (event) => {
+              if (!draggingRef.current) {
+                return;
+              }
+              const deltaY = event.clientY - startClientYRef.current;
+              draggingRef.current = false;
+              setDragging(false);
+              setDragOffsetY(0);
+              finishDrag(deltaY);
+            }
+          : undefined
+      }
+      onPointerCancel={
+        editable && !disabled
+          ? () => {
+              draggingRef.current = false;
+              setDragging(false);
+              setDragOffsetY(0);
+            }
+          : undefined
+      }
+    >
+      <span className="day-meeting-time">
+        {formatSlotTime(busySlot.start)}–{formatSlotTime(busySlot.end)}
+      </span>
+      {busySlot.title ? (
+        <span className="day-meeting-title">{busySlot.title}</span>
+      ) : null}
+    </div>
   );
 }
 
@@ -169,6 +327,8 @@ export function DayScheduleBoard({
   onGenerate,
   onUploadStatus,
   onEditSlot,
+  onUpdateBusySlots,
+  currentUserId,
   renderSlotCell,
 }: DayScheduleBoardProps) {
   const members = profile.household?.members ?? [];
@@ -180,7 +340,24 @@ export function DayScheduleBoard({
   const slotsStartRef = useRef<HTMLDivElement>(null);
   const slotsEndRef = useRef<HTMLDivElement>(null);
   const trackRef = useRef<HTMLDivElement>(null);
+  const [trackHeight, setTrackHeight] = useState(0);
   const boardHeight = `${timeSlots.length * SLOT_HEIGHT_REM}rem`;
+
+  useLayoutEffect(() => {
+    const track = trackRef.current;
+    if (!track) {
+      return;
+    }
+
+    function measure() {
+      setTrackHeight(trackRef.current?.clientHeight ?? 0);
+    }
+
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(track);
+    return () => observer.disconnect();
+  }, [boardHeight, timeSlots.length]);
 
   return (
     <div className="day-board-wrapper" ref={boardRef}>
@@ -192,6 +369,8 @@ export function DayScheduleBoard({
       >
         <div className="day-board-header">
           <div className="day-corner" />
+          <div className="day-watch-header">Watch</div>
+          <div className="day-watch-divider" aria-hidden="true" />
           {members.map((member) => (
             <div className="day-member-header" key={member.userId}>
               <span
@@ -203,16 +382,10 @@ export function DayScheduleBoard({
               <span className="day-member-name">{member.displayName}</span>
             </div>
           ))}
-          <div className="day-watch-divider" aria-hidden="true" />
-          <div className="day-watch-header">Watch</div>
         </div>
 
         <div className="day-board-actions">
-          <div className="day-actions-label">Day</div>
-          {members.map((member) => (
-            <div className="day-member-action-spacer" key={member.userId} aria-hidden="true" />
-          ))}
-          <div className="day-watch-divider" aria-hidden="true" />
+          <div className="day-actions-label">{formatShortDate(date)}</div>
           <div className="day-watch-actions">
             <button
               type="button"
@@ -233,6 +406,10 @@ export function DayScheduleBoard({
               {uploadedCount}/{memberIds.length} uploaded
             </button>
           </div>
+          <div className="day-watch-divider" aria-hidden="true" />
+          {members.map((member) => (
+            <div className="day-member-action-spacer" key={member.userId} aria-hidden="true" />
+          ))}
         </div>
 
         <div className="day-board-body" ref={trackRef} style={{ minHeight: boardHeight }}>
@@ -254,42 +431,6 @@ export function DayScheduleBoard({
             ))}
           </div>
 
-          {members.map((member) => {
-            const busySlots = getMemberBusySlots(member.userId, date, householdUploads);
-            const accent = memberColor(member.userId, memberIds);
-
-            return (
-              <div className="day-meetings-column" key={member.userId}>
-                <div className="day-meetings-track" style={{ minHeight: boardHeight }}>
-                  {busySlots.map((busySlot, index) => (
-                    <div
-                      key={`${busySlot.start}-${busySlot.end}-${index}`}
-                      className="day-meeting-block"
-                      style={{
-                        ...meetingBlockStyle(busySlot, metrics),
-                        '--meeting-accent': accent,
-                      } as CSSProperties}
-                      title={
-                        busySlot.title
-                          ? `${busySlot.start}–${busySlot.end} · ${busySlot.title}`
-                          : `${busySlot.start}–${busySlot.end}`
-                      }
-                    >
-                      <span className="day-meeting-time">
-                        {formatSlotTime(busySlot.start)}–{formatSlotTime(busySlot.end)}
-                      </span>
-                      {busySlot.title ? (
-                        <span className="day-meeting-title">{busySlot.title}</span>
-                      ) : null}
-                    </div>
-                  ))}
-                </div>
-              </div>
-            );
-          })}
-
-          <div className="day-watch-divider day-watch-divider-body" aria-hidden="true" />
-
           <div className="day-watch-column">
             {timeSlots.map((timeSlot, rowIndex) => {
               const slot = schedule?.slots[rowIndex];
@@ -308,6 +449,36 @@ export function DayScheduleBoard({
               );
             })}
           </div>
+
+          <div className="day-watch-divider day-watch-divider-body" aria-hidden="true" />
+
+          {members.map((member) => {
+            const busySlots = getMemberBusySlots(member.userId, date, householdUploads);
+            const accent = memberColor(member.userId, memberIds);
+            const editable = member.userId === currentUserId && Boolean(onUpdateBusySlots);
+
+            return (
+              <div className="day-meetings-column" key={member.userId}>
+                <div className="day-meetings-track" style={{ minHeight: boardHeight }}>
+                  {busySlots.map((busySlot, index) => (
+                    <MeetingBlock
+                      key={`${busySlot.start}-${busySlot.end}-${index}`}
+                      busySlot={busySlot}
+                      slotIndex={index}
+                      memberUserId={member.userId}
+                      accent={accent}
+                      metrics={metrics}
+                      trackHeight={trackHeight}
+                      editable={editable}
+                      disabled={busy}
+                      busySlots={busySlots}
+                      onUpdateBusySlots={(nextBusySlots) => onUpdateBusySlots?.(date, nextBusySlots)}
+                    />
+                  ))}
+                </div>
+              </div>
+            );
+          })}
         </div>
       </div>
 

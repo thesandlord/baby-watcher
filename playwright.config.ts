@@ -18,7 +18,7 @@ export default defineConfig({
     ...devices['Desktop Chrome'],
     baseURL,
     locale: 'en-US',
-    timezoneId: 'UTC',
+    timezoneId: 'America/Los_Angeles',
     trace: 'on-first-retry',
     screenshot: 'only-on-failure',
     video: 'retain-on-failure',

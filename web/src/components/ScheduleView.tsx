@@ -13,12 +13,14 @@ import {
   generateTimeSlots,
   WORKDAY_END,
   WORKDAY_START,
+  type BusySlot,
   type DaySchedule,
   type ScheduleSlot,
 } from '@baby-watcher/shared';
 import { memberColor, memberInitials } from '../lib/members';
 import {
   currentTimeLineFraction,
+  formatCalendarDate,
   formatDisplayDate,
   formatSlotTime,
   formatViewHeading,
@@ -50,6 +52,7 @@ interface ScheduleViewProps {
   onGenerate: (date: string) => void;
   onSwap: (sourceDate: string, sourceStart: string, targetDate: string, targetStart: string) => void;
   onAssign: (date: string, start: string, watcherId: string | null) => void;
+  onUpdateBusySlots?: (date: string, busySlots: BusySlot[]) => void;
   onDeleteUpload: (date: string) => void;
   onCleanupOldUploads: () => void;
   onSignOut: () => void;
@@ -129,6 +132,7 @@ export function ScheduleView({
   onGenerate,
   onSwap,
   onAssign,
+  onUpdateBusySlots,
   onDeleteUpload,
   onCleanupOldUploads,
   onSignOut,
@@ -245,9 +249,11 @@ export function ScheduleView({
               busy={busy}
               showNowLine={showNowLine}
               nowLineFraction={nowLineFraction ?? 0}
+              currentUserId={profile.uid}
               onGenerate={onGenerate}
               onUploadStatus={setUploadStatusDate}
               onEditSlot={(date, slot) => setEditing({ date, slot })}
+              onUpdateBusySlots={onUpdateBusySlots}
               renderSlotCell={renderSlotCell}
             />
           ) : (
@@ -259,7 +265,7 @@ export function ScheduleView({
               >
                 <div className="week-corner" />
                 {viewDates.map((date) => {
-                  const parsed = new Date(`${date}T12:00:00`);
+                  const dayNumber = formatCalendarDate(date, { day: 'numeric' });
                   const isToday = date === today;
                   return (
                     <button
@@ -270,8 +276,8 @@ export function ScheduleView({
                       className={`week-day-header${activeDate === date ? ' active' : ''}${isToday ? ' today' : ''}`}
                       onClick={() => onActiveDateChange(date)}
                     >
-                      <span>{parsed.toLocaleDateString(undefined, { weekday: 'short' })}</span>
-                      <strong>{parsed.getDate()}</strong>
+                      <span>{formatCalendarDate(date, { weekday: 'short' })}</span>
+                      <strong>{dayNumber}</strong>
                     </button>
                   );
                 })}
