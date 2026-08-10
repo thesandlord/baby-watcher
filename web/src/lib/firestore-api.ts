@@ -1,9 +1,11 @@
 import {
   collection,
+  deleteDoc,
   doc,
   getDoc,
   getDocs,
   query,
+  runTransaction,
   serverTimestamp,
   setDoc,
   where,
@@ -15,9 +17,17 @@ import {
   hashScheduleInput,
   type DaySchedule,
   type PersonAvailability,
+  type ScheduleSlot,
 } from '@baby-watcher/shared';
 import { auth, db } from './firebase';
 import type { UserProfile } from './utils';
+
+export interface UploadedAvailability {
+  date: string;
+  busySlots: PersonAvailability['busySlots'];
+  confidence: string;
+  updatedAt: Date | null;
+}
 
 function requireUserId(): string {
   const uid = auth.currentUser?.uid;
@@ -177,12 +187,50 @@ export async function saveAvailability(
   });
 }
 
+export async function listMyAvailability(
+  householdId: string
+): Promise<UploadedAvailability[]> {
+  const uid = requireUserId();
+  const snapshot = await getDocs(
+    query(
+      collection(db, 'households', householdId, 'availability'),
+      where('userId', '==', uid)
+    )
+  );
+
+  return snapshot.docs
+    .map((availabilityDoc) => {
+      const data = availabilityDoc.data();
+      const timestamp = data.updatedAt as { toDate?: () => Date } | undefined;
+      return {
+        date: data.date as string,
+        busySlots: (data.busySlots ?? []) as PersonAvailability['busySlots'],
+        confidence: (data.confidence as string) ?? 'unknown',
+        updatedAt: timestamp?.toDate?.() ?? null,
+      };
+    })
+    .sort((a, b) => b.date.localeCompare(a.date));
+}
+
+export async function deleteMyAvailability(householdId: string, date: string): Promise<void> {
+  const uid = requireUserId();
+  await deleteDoc(doc(db, 'households', householdId, 'availability', `${date}_${uid}`));
+}
+
 export async function getSchedule(householdId: string, date: string): Promise<DaySchedule | null> {
   const scheduleDoc = await getDoc(doc(db, 'households', householdId, 'schedules', date));
   if (!scheduleDoc.exists()) {
     return null;
   }
   return scheduleDoc.data() as DaySchedule;
+}
+
+export async function getSchedulesForDates(
+  householdId: string,
+  dates: string[]
+): Promise<Record<string, DaySchedule | null>> {
+  const schedules = await Promise.all(dates.map((date) => getSchedule(householdId, date)));
+  return Object.fromEntries(dates.map((date, index) => [date, schedules[index]]));
 }
 
 export async function regenerateSchedule(
@@ -206,13 +254,82 @@ export async function regenerateSchedule(
   return schedule;
 }
 
-export async function loadOrGenerateSchedule(
+export async function updateScheduleAssignment(
   householdId: string,
-  date: string
+  date: string,
+  start: string,
+  assignment: Pick<ScheduleSlot, 'watcherId' | 'watcherName'>
 ): Promise<DaySchedule> {
-  const existing = await getSchedule(householdId, date);
-  if (existing) {
-    return existing;
-  }
-  return regenerateSchedule(householdId, date);
+  const scheduleRef = doc(db, 'households', householdId, 'schedules', date);
+  return runTransaction(db, async (transaction) => {
+    const snapshot = await transaction.get(scheduleRef);
+    if (!snapshot.exists()) {
+      throw new Error('This schedule no longer exists.');
+    }
+    const schedule = snapshot.data() as DaySchedule;
+    const updated = {
+      ...schedule,
+      slots: schedule.slots.map((slot) => slot.start === start ? {
+        ...slot,
+        ...assignment,
+        isManualOverride: true,
+      } : slot),
+    };
+    transaction.set(scheduleRef, updated);
+    return updated;
+  });
+}
+
+export async function swapScheduleAssignments(
+  householdId: string,
+  source: { date: string; start: string },
+  target: { date: string; start: string }
+): Promise<DaySchedule[]> {
+  const sourceRef = doc(db, 'households', householdId, 'schedules', source.date);
+  const targetRef = doc(db, 'households', householdId, 'schedules', target.date);
+
+  return runTransaction(db, async (transaction) => {
+    const sourceSnapshot = await transaction.get(sourceRef);
+    const targetSnapshot = source.date === target.date
+      ? sourceSnapshot
+      : await transaction.get(targetRef);
+    if (!sourceSnapshot.exists() || !targetSnapshot.exists()) {
+      throw new Error('One of these schedules no longer exists.');
+    }
+
+    const sourceSchedule = sourceSnapshot.data() as DaySchedule;
+    const targetSchedule = targetSnapshot.data() as DaySchedule;
+    const sourceSlot = sourceSchedule.slots.find((slot) => slot.start === source.start);
+    const targetSlot = targetSchedule.slots.find((slot) => slot.start === target.start);
+    if (!sourceSlot || !targetSlot) {
+      throw new Error('One of these slots no longer exists.');
+    }
+
+    const applyAssignment = (
+      schedule: DaySchedule,
+      start: string,
+      assignment: ScheduleSlot
+    ): DaySchedule => ({
+      ...schedule,
+      slots: schedule.slots.map((slot) => slot.start === start ? {
+        ...slot,
+        watcherId: assignment.watcherId,
+        watcherName: assignment.watcherName,
+        isManualOverride: true,
+      } : slot),
+    });
+
+    if (source.date === target.date) {
+      const firstSwap = applyAssignment(sourceSchedule, source.start, targetSlot);
+      const updated = applyAssignment(firstSwap, target.start, sourceSlot);
+      transaction.set(sourceRef, updated);
+      return [updated];
+    }
+
+    const updatedSource = applyAssignment(sourceSchedule, source.start, targetSlot);
+    const updatedTarget = applyAssignment(targetSchedule, target.start, sourceSlot);
+    transaction.set(sourceRef, updatedSource);
+    transaction.set(targetRef, updatedTarget);
+    return [updatedSource, updatedTarget];
+  });
 }

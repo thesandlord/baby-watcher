@@ -1,118 +1,313 @@
-import { useState } from 'react';
-import type { DaySchedule } from '@baby-watcher/shared';
+import { useState, type CSSProperties } from 'react';
+import {
+  DndContext,
+  PointerSensor,
+  TouchSensor,
+  useDraggable,
+  useDroppable,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from '@dnd-kit/core';
+import {
+  generateTimeSlots,
+  type DaySchedule,
+  type ScheduleSlot,
+} from '@baby-watcher/shared';
 import { memberColor, memberInitials } from '../lib/members';
-import { formatDisplayDate, formatSlotTime, type UserProfile } from '../lib/utils';
+import {
+  formatDisplayDate,
+  formatSlotTime,
+  formatWeekRange,
+  type UserProfile,
+} from '../lib/utils';
+import type { UploadedAvailability } from '../lib/firestore-api';
 import { HouseholdMenu } from './HouseholdMenu';
 
 interface ScheduleViewProps {
   profile: UserProfile;
-  schedule: DaySchedule | null;
-  selectedDate: string;
+  schedules: Record<string, DaySchedule | null>;
+  weekDates: string[];
+  activeDate: string;
+  uploads: UploadedAvailability[];
   busy: boolean;
   error: string | null;
-  onDateChange: (date: string) => void;
-  onRegenerate: () => void;
+  onActiveDateChange: (date: string) => void;
+  onPreviousWeek: () => void;
+  onNextWeek: () => void;
+  onToday: () => void;
+  onGenerate: (date: string) => void;
+  onSwap: (sourceDate: string, sourceStart: string, targetDate: string, targetStart: string) => void;
+  onAssign: (date: string, start: string, watcherId: string | null) => void;
+  onDeleteUpload: (date: string) => void;
   onSignOut: () => void;
+}
+
+function slotId(date: string, start: string): string {
+  return `${date}|${start}`;
+}
+
+function parseSlotId(id: string): [string, string] {
+  const [date, start] = id.split('|');
+  return [date, start];
+}
+
+interface SlotCellProps {
+  date: string;
+  slot: ScheduleSlot;
+  memberIds: string[];
+  disabled: boolean;
+  onClick: () => void;
+}
+
+function SlotCell({ date, slot, memberIds, disabled, onClick }: SlotCellProps) {
+  const id = slotId(date, slot.start);
+  const { attributes, listeners, setNodeRef: setDraggableRef, transform, isDragging } =
+    useDraggable({ id, disabled });
+  const { setNodeRef: setDroppableRef, isOver } = useDroppable({ id, disabled });
+  const accent = slot.watcherId
+    ? memberColor(slot.watcherId, memberIds)
+    : 'var(--text-muted)';
+  const style = {
+    '--slot-accent': accent,
+    transform: transform ? `translate3d(${transform.x}px, ${transform.y}px, 0)` : undefined,
+  } as CSSProperties;
+
+  return (
+    <button
+      ref={(node) => {
+        setDraggableRef(node);
+        setDroppableRef(node);
+      }}
+      type="button"
+      disabled={disabled}
+      data-testid={`slot-${date}-${slot.start}`}
+      data-date={date}
+      data-start={slot.start}
+      data-watcher-id={slot.watcherId ?? ''}
+      className={`week-slot${isDragging ? ' dragging' : ''}${isOver ? ' drag-over' : ''}`}
+      style={style}
+      onClick={onClick}
+      aria-label={`${formatDisplayDate(date)}, ${formatSlotTime(slot.start)}: ${slot.watcherName}`}
+      {...listeners}
+      {...attributes}
+    >
+      <span className="week-slot-name">{slot.watcherName}</span>
+      {slot.isManualOverride ? <span className="manual-dot" title="Manually changed" /> : null}
+    </button>
+  );
 }
 
 export function ScheduleView({
   profile,
-  schedule,
-  selectedDate,
+  schedules,
+  weekDates,
+  activeDate,
+  uploads,
   busy,
   error,
-  onDateChange,
-  onRegenerate,
+  onActiveDateChange,
+  onPreviousWeek,
+  onNextWeek,
+  onToday,
+  onGenerate,
+  onSwap,
+  onAssign,
+  onDeleteUpload,
   onSignOut,
 }: ScheduleViewProps) {
   const memberIds = profile.household?.members.map((member) => member.userId) ?? [];
   const [menuOpen, setMenuOpen] = useState(false);
+  const [editing, setEditing] = useState<{ date: string; slot: ScheduleSlot } | null>(null);
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
+    useSensor(TouchSensor, { activationConstraint: { delay: 200, tolerance: 6 } })
+  );
+  const firstSchedule = weekDates.map((date) => schedules[date]).find(Boolean);
+  const timeSlots = firstSchedule?.slots ?? generateTimeSlots('08:00', '17:00', 30);
+
+  function handleDragEnd(event: DragEndEvent) {
+    if (!event.over || event.active.id === event.over.id) {
+      return;
+    }
+    const [sourceDate, sourceStart] = parseSlotId(String(event.active.id));
+    const [targetDate, targetStart] = parseSlotId(String(event.over.id));
+    onSwap(sourceDate, sourceStart, targetDate, targetStart);
+  }
 
   return (
     <>
-      <div className="schedule-header schedule-header-compact">
+      <div className="schedule-header week-toolbar">
         <div className="schedule-meta">
-          <h1 className="hero-title">{formatDisplayDate(selectedDate)}</h1>
+          <span className="schedule-badge">Weekday schedule</span>
+          <h1 className="hero-title">{formatWeekRange(weekDates)}</h1>
         </div>
-        <button
-          type="button"
-          className="icon-button menu-button"
-          aria-label="Open household menu"
-          onClick={() => setMenuOpen(true)}
-        >
-          ☰
-        </button>
+        <div className="week-toolbar-actions">
+          <button type="button" className="ghost-button today-button" onClick={onToday}>
+            Today
+          </button>
+          <button type="button" className="icon-button" onClick={onPreviousWeek} aria-label="Previous week">
+            ‹
+          </button>
+          <button type="button" className="icon-button" onClick={onNextWeek} aria-label="Next week">
+            ›
+          </button>
+          <button
+            type="button"
+            className="icon-button menu-button"
+            aria-label="Open profile and household menu"
+            onClick={() => setMenuOpen(true)}
+          >
+            ☰
+          </button>
+        </div>
       </div>
-
-      <label className="day-picker-row">
-        <span className="field-label">Choose day</span>
-        <input
-          className="date-input"
-          type="date"
-          value={selectedDate}
-          onChange={(event) => onDateChange(event.target.value)}
-        />
-      </label>
 
       {error ? <div className="error-banner">{error}</div> : null}
 
-      <div className="schedule-list">
-        {schedule?.slots.map((slot) => {
-          const accent = slot.watcherId
-            ? memberColor(slot.watcherId, memberIds)
-            : 'var(--danger)';
-
-          return (
-            <div
-              key={`${slot.start}-${slot.end}`}
-              className="schedule-row"
-              style={{ ['--slot-accent' as string]: accent }}
-            >
-              <div className="schedule-time">
-                {formatSlotTime(slot.start)}
-                <br />
-                {formatSlotTime(slot.end)}
-              </div>
-              <div
-                className={
-                  slot.watcherId ? 'schedule-watcher' : 'schedule-watcher unassigned'
-                }
-              >
-                {slot.watcherId ? (
-                  <span
-                    className="member-avatar"
-                    style={{ background: accent }}
-                  >
-                    {memberInitials(slot.watcherName)}
-                  </span>
-                ) : null}
-                {slot.watcherName}
-              </div>
-              <span className="schedule-duration">30m</span>
-            </div>
-          );
-        })}
-
-        {!schedule && !busy ? (
-          <div className="card muted-copy">
-            Upload a calendar screenshot to generate the first schedule for this day.
-          </div>
-        ) : null}
+      <div className="member-legend" aria-label="Household member colors">
+        {profile.household?.members.map((member) => (
+          <span key={member.userId} className="member-pill">
+            <span className="legend-dot" style={{ background: memberColor(member.userId, memberIds) }} />
+            {member.displayName}
+          </span>
+        ))}
       </div>
+
+      <DndContext sensors={sensors} onDragEnd={handleDragEnd}>
+        <div className="week-scroll">
+          <div className="week-grid" data-testid="week-grid">
+            <div className="week-corner" />
+            {weekDates.map((date) => {
+              const parsed = new Date(`${date}T12:00:00`);
+              return (
+                <button
+                  key={date}
+                  type="button"
+                  data-testid={`day-${date}`}
+                  data-date={date}
+                  className={`week-day-header${activeDate === date ? ' active' : ''}`}
+                  onClick={() => onActiveDateChange(date)}
+                >
+                  <span>{parsed.toLocaleDateString(undefined, { weekday: 'short' })}</span>
+                  <strong>{parsed.getDate()}</strong>
+                </button>
+              );
+            })}
+
+            {timeSlots.map((timeSlot, rowIndex) => (
+              <div className="week-grid-row" key={timeSlot.start}>
+                <div className="week-time">{formatSlotTime(timeSlot.start)}</div>
+                {weekDates.map((date) => {
+                  const slot = schedules[date]?.slots[rowIndex];
+                  return (
+                    <div className="week-cell" key={`${date}-${timeSlot.start}`}>
+                      {slot ? (
+                        <SlotCell
+                          date={date}
+                          slot={slot}
+                          memberIds={memberIds}
+                          disabled={busy}
+                          onClick={() => {
+                            onActiveDateChange(date);
+                            setEditing({ date, slot });
+                          }}
+                        />
+                      ) : null}
+                    </div>
+                  );
+                })}
+              </div>
+            ))}
+
+            <div className="week-footer-label">Slots</div>
+            {weekDates.map((date) => (
+              <div className="week-day-action" key={date}>
+                <button
+                  type="button"
+                  data-testid={`generate-${date}`}
+                  className={schedules[date] ? 'ghost-button generate-button' : 'primary-button generate-button'}
+                  disabled={busy}
+                  onClick={() => onGenerate(date)}
+                >
+                  {schedules[date] ? 'Regenerate' : 'Generate slots'}
+                </button>
+              </div>
+            ))}
+          </div>
+          {!firstSchedule && !busy ? (
+            <div className="week-empty-hint">
+              Upload availability, then generate slots under each day.
+            </div>
+          ) : null}
+        </div>
+      </DndContext>
 
       <HouseholdMenu
         profile={profile}
+        uploads={uploads}
         busy={busy}
         open={menuOpen}
         onClose={() => setMenuOpen(false)}
-        onRegenerate={() => {
-          onRegenerate();
+        onDeleteUpload={onDeleteUpload}
+        onSelectUploadDate={(date) => {
+          onActiveDateChange(date);
+          setMenuOpen(false);
         }}
         onSignOut={() => {
           setMenuOpen(false);
           onSignOut();
         }}
       />
+
+      {editing ? (
+        <div className="modal-backdrop" role="presentation" onClick={() => setEditing(null)}>
+          <div
+            className="modal-sheet"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Override watcher"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <h2 className="hero-title" style={{ fontSize: '1.25rem' }}>Choose watcher</h2>
+            <p className="hero-subtitle">
+              {formatDisplayDate(editing.date)} at {formatSlotTime(editing.slot.start)}
+            </p>
+            <div className="assignment-options">
+              {profile.household?.members.map((member) => (
+                <button
+                  key={member.userId}
+                  type="button"
+                  className="assignment-option"
+                  aria-label={member.displayName}
+                  onClick={() => {
+                    onAssign(editing.date, editing.slot.start, member.userId);
+                    setEditing(null);
+                  }}
+                >
+                  <span
+                    className="member-avatar"
+                    style={{ background: memberColor(member.userId, memberIds) }}
+                  >
+                    {memberInitials(member.displayName)}
+                  </span>
+                  {member.displayName}
+                </button>
+              ))}
+              <button
+                type="button"
+                className="assignment-option unassigned-option"
+                onClick={() => {
+                  onAssign(editing.date, editing.slot.start, null);
+                  setEditing(null);
+                }}
+              >
+                Unassigned
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </>
   );
 }

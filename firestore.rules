@@ -46,7 +46,9 @@ service cloud.firestore {
           && docId == request.resource.data.date + '_' + request.auth.uid
           && request.resource.data.userId == request.auth.uid
           && request.resource.data.date is string;
-        allow delete: if false;
+        allow delete: if inHousehold(householdId)
+          && docId == resource.data.date + '_' + request.auth.uid
+          && resource.data.userId == request.auth.uid;
       }
 
       match /schedules/{date} {
