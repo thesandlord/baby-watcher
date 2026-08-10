@@ -29,7 +29,7 @@ Everything runs client-side: Firebase Auth + Firestore for data, OpenRouter for 
 npm install
 ```
 
-Calendar extraction hardcodes up to 5 free image-capable OpenRouter models (Gemma, Nemotron, then `openrouter/free`) and falls back when one is rate-limited.
+Calendar extraction uses OpenRouter's free router (`openrouter/free`), which picks an available free vision-capable model for each request.
 
 4. Run tests:
 
