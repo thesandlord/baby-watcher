@@ -1073,30 +1073,11 @@ button {
   cursor: grab;
 }
 
-.day-meeting-block.dragging,
-.day-meeting-block.resizing {
+.day-meeting-block.dragging {
   cursor: grabbing;
   z-index: 5;
   opacity: 0.88;
   box-shadow: var(--shadow-soft);
-}
-
-.day-meeting-resize-handle {
-  position: absolute;
-  left: 0;
-  right: 0;
-  height: 0.45rem;
-  touch-action: none;
-}
-
-.day-meeting-resize-start {
-  top: 0;
-  cursor: ns-resize;
-}
-
-.day-meeting-resize-end {
-  bottom: 0;
-  cursor: ns-resize;
 }
 
 .meeting-edit-fields {

@@ -148,7 +148,7 @@ export async function overrideSlot(
   watcherName: string
 ): Promise<void> {
   await goToDate(page, date);
-  await page.getByTestId(`slot-${date}-${start}`).click();
+  await page.getByTestId(`slot-${date}-${start}`).dblclick();
   const dialog = page.getByRole('dialog', { name: 'Override watcher' });
   await expect(dialog).toBeVisible();
   await dialog.getByRole('button', { name: watcherName, exact: true }).click();

@@ -19,6 +19,7 @@ import {
   type ScheduleSlot,
 } from '@baby-watcher/shared';
 import { memberColor, memberInitials } from '../lib/members';
+import { useSlotActivation } from '../lib/useSlotActivation';
 import {
   activeWatchSlotAtNow,
   currentTimeLineFraction,
@@ -84,6 +85,7 @@ function SlotCell({ date, slot, memberIds, disabled, onClick }: SlotCellProps) {
   const { attributes, listeners, setNodeRef: setDraggableRef, transform, isDragging } =
     useDraggable({ id, disabled });
   const { setNodeRef: setDroppableRef, isOver } = useDroppable({ id, disabled });
+  const activation = useSlotActivation(onClick, disabled);
   const accent = slot.watcherId
     ? memberColor(slot.watcherId, memberIds)
     : 'var(--text-muted)';
@@ -106,10 +108,18 @@ function SlotCell({ date, slot, memberIds, disabled, onClick }: SlotCellProps) {
       data-watcher-id={slot.watcherId ?? ''}
       className={`week-slot${isDragging ? ' dragging' : ''}${isOver ? ' drag-over' : ''}`}
       style={style}
-      onClick={onClick}
       aria-label={`${formatDisplayDate(date)}, ${formatSlotTime(slot.start)}: ${slot.watcherName}`}
-      {...listeners}
       {...attributes}
+      {...listeners}
+      onDoubleClick={activation.onDoubleClick}
+      onClick={activation.onClick}
+      onPointerDown={(event) => {
+        listeners?.onPointerDown?.(event);
+        activation.onPointerDown(event);
+      }}
+      onPointerMove={activation.onPointerMove}
+      onPointerUp={activation.onPointerUp}
+      onPointerCancel={activation.onPointerCancel}
     >
       <span className="week-slot-name">{slot.watcherName}</span>
       {slot.isManualOverride ? <span className="manual-dot" title="Manually changed" /> : null}
@@ -149,7 +159,7 @@ export function ScheduleView({
   const [uploadStatusDate, setUploadStatusDate] = useState<string | null>(null);
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
-    useSensor(TouchSensor, { activationConstraint: { delay: 200, tolerance: 6 } })
+    useSensor(TouchSensor, { activationConstraint: { delay: 550, tolerance: 8 } })
   );
   const slotEditingDisabled = busy || !canEditSchedule;
   const firstSchedule = viewDates.map((date) => schedules[date]).find(Boolean);
