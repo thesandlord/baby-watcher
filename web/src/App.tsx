@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   onAuthStateChanged,
   signInWithEmailAndPassword,
@@ -13,10 +13,11 @@ import {
   deleteMyAvailability,
   getProfile,
   getSchedule,
-  getSchedulesForDates,
-  listAvailabilityForDates,
-  listMyAvailability,
   regenerateSchedule,
+  subscribeAvailabilityForDates,
+  subscribeHouseholdMembers,
+  subscribeMyAvailability,
+  subscribeSchedulesForDates,
   swapScheduleAssignments,
   updateScheduleAssignment,
   type UploadedAvailability,
@@ -51,7 +52,6 @@ function AppContent() {
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const weekRequestId = useRef(0);
   const weekDates = useMemo(() => weekdayDates(weekStart), [weekStart]);
 
   useEffect(() => {
@@ -77,51 +77,49 @@ function AppContent() {
   }, []);
 
   useEffect(() => {
-    if (!user || !profile?.household) {
-      return;
-    }
-
-    void loadWeek(weekDates);
-    void loadUploads();
-  }, [user, profile?.household?.id, weekStart]);
-
-  async function loadWeek(dates = weekDates) {
     if (!profile?.household) {
       return;
     }
 
-    const requestId = ++weekRequestId.current;
-    setBusy(true);
-    setError(null);
-    try {
-      const nextSchedules = await getSchedulesForDates(profile.household.id, dates);
-      if (requestId === weekRequestId.current) {
-        setSchedules(nextSchedules);
-      }
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load schedules.');
-    } finally {
-      if (requestId === weekRequestId.current) {
-        setBusy(false);
-      }
-    }
-  }
+    setSchedules({});
 
-  async function loadUploads() {
-    if (!profile?.household) {
-      return;
-    }
-    try {
-      const [myUploads, allUploads] = await Promise.all([
-        listMyAvailability(profile.household.id),
-        listAvailabilityForDates(profile.household.id, weekDates),
-      ]);
-      setUploads(myUploads);
-      setHouseholdUploads(allUploads);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load uploaded schedules.');
-    }
-  }
+    const householdId = profile.household.id;
+    const handleSubscriptionError = (err: Error) => {
+      setError(err.message);
+    };
+
+    const unsubscribeSchedules = subscribeSchedulesForDates(
+      householdId,
+      weekDates,
+      setSchedules,
+      handleSubscriptionError
+    );
+    const unsubscribeHouseholdUploads = subscribeAvailabilityForDates(
+      householdId,
+      weekDates,
+      setHouseholdUploads,
+      handleSubscriptionError
+    );
+    const unsubscribeMyUploads = subscribeMyAvailability(
+      householdId,
+      setUploads,
+      handleSubscriptionError
+    );
+    const unsubscribeMembers = subscribeHouseholdMembers(
+      householdId,
+      (household) => {
+        setProfile((current) => (current ? { ...current, household } : current));
+      },
+      handleSubscriptionError
+    );
+
+    return () => {
+      unsubscribeSchedules();
+      unsubscribeHouseholdUploads();
+      unsubscribeMyUploads();
+      unsubscribeMembers();
+    };
+  }, [profile?.household?.id, weekStart]);
 
   async function handleGenerate(date: string) {
     if (!profile?.household) {
@@ -134,8 +132,7 @@ function AppContent() {
       if (existing && !window.confirm('Regenerate this day? Existing slot changes will be replaced.')) {
         return;
       }
-      const schedule = await regenerateSchedule(profile.household.id, date);
-      setSchedules((current) => ({ ...current, [date]: schedule }));
+      await regenerateSchedule(profile.household.id, date);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to generate schedule.');
     } finally {
@@ -151,13 +148,12 @@ function AppContent() {
     setBusy(true);
     setError(null);
     try {
-      const schedule = await updateScheduleAssignment(
+      await updateScheduleAssignment(
         profile.household.id,
         date,
         start,
         { watcherId, watcherName: watcher?.displayName ?? 'Unassigned' }
       );
-      setSchedules((current) => ({ ...current, [date]: schedule }));
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to update slot.');
     } finally {
@@ -177,15 +173,11 @@ function AppContent() {
     setBusy(true);
     setError(null);
     try {
-      const changed = await swapScheduleAssignments(
+      await swapScheduleAssignments(
         profile.household.id,
         { date: sourceDate, start: sourceStart },
         { date: targetDate, start: targetStart }
       );
-      setSchedules((current) => ({
-        ...current,
-        ...Object.fromEntries(changed.map((schedule) => [schedule.date, schedule])),
-      }));
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to swap slots.');
     } finally {
@@ -201,7 +193,6 @@ function AppContent() {
     setError(null);
     try {
       await deleteMyAvailability(profile.household.id, date);
-      await loadUploads();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to delete uploaded schedule.');
     } finally {
@@ -228,11 +219,6 @@ function AppContent() {
   async function refreshProfile() {
     const nextProfile = await getProfile();
     setProfile(nextProfile);
-    if (nextProfile?.household) {
-      setUploads(await listMyAvailability(nextProfile.household.id));
-      setHouseholdUploads(await listAvailabilityForDates(nextProfile.household.id, weekDates));
-      setSchedules(await getSchedulesForDates(nextProfile.household.id, weekDates));
-    }
   }
 
   if (loading) {
@@ -272,11 +258,7 @@ function AppContent() {
           <UploadMeetingsButton
             profile={profile}
             selectedDate={activeDate}
-            onUploaded={async () => {
-              await loadUploads();
-              await loadWeek();
-            }}
-            onError={setError}
+            weekDates={weekDates}
           />
         )}
         onActiveDateChange={selectDate}

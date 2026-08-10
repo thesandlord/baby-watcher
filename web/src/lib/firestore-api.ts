@@ -4,6 +4,7 @@ import {
   doc,
   getDoc,
   getDocs,
+  onSnapshot,
   query,
   runTransaction,
   serverTimestamp,
@@ -11,6 +12,7 @@ import {
   where,
   writeBatch,
   arrayUnion,
+  type Unsubscribe,
 } from 'firebase/firestore';
 import {
   generateSchedule,
@@ -29,6 +31,21 @@ export interface UploadedAvailability {
   busySlots: PersonAvailability['busySlots'];
   confidence: string;
   updatedAt: Date | null;
+}
+
+function parseAvailabilityDoc(
+  availabilityDoc: { data: () => Record<string, unknown> }
+): UploadedAvailability {
+  const data = availabilityDoc.data();
+  const timestamp = data.updatedAt as { toDate?: () => Date } | undefined;
+  return {
+    date: data.date as string,
+    userId: data.userId as string,
+    displayName: data.displayName as string,
+    busySlots: (data.busySlots ?? []) as PersonAvailability['busySlots'],
+    confidence: (data.confidence as string) ?? 'unknown',
+    updatedAt: timestamp?.toDate?.() ?? null,
+  };
 }
 
 function requireUserId(): string {
@@ -189,6 +206,36 @@ export async function saveAvailability(
   });
 }
 
+export async function saveAvailabilityBatch(
+  householdId: string,
+  displayName: string,
+  days: Array<{
+    date: string;
+    busySlots: PersonAvailability['busySlots'];
+    confidence: string;
+  }>
+) {
+  if (days.length === 0) {
+    return;
+  }
+
+  const uid = requireUserId();
+  const batch = writeBatch(db);
+
+  for (const day of days) {
+    batch.set(doc(db, 'households', householdId, 'availability', `${day.date}_${uid}`), {
+      date: day.date,
+      userId: uid,
+      displayName,
+      busySlots: day.busySlots,
+      confidence: day.confidence,
+      updatedAt: serverTimestamp(),
+    });
+  }
+
+  await batch.commit();
+}
+
 export async function listMyAvailability(
   householdId: string
 ): Promise<UploadedAvailability[]> {
@@ -201,18 +248,7 @@ export async function listMyAvailability(
   );
 
   return snapshot.docs
-    .map((availabilityDoc) => {
-      const data = availabilityDoc.data();
-      const timestamp = data.updatedAt as { toDate?: () => Date } | undefined;
-      return {
-        date: data.date as string,
-        userId: data.userId as string,
-        displayName: data.displayName as string,
-        busySlots: (data.busySlots ?? []) as PersonAvailability['busySlots'],
-        confidence: (data.confidence as string) ?? 'unknown',
-        updatedAt: timestamp?.toDate?.() ?? null,
-      };
-    })
+    .map((availabilityDoc) => parseAvailabilityDoc(availabilityDoc))
     .sort((a, b) => b.date.localeCompare(a.date));
 }
 
@@ -231,18 +267,135 @@ export async function listAvailabilityForDates(
     )
   );
 
-  return snapshot.docs.map((availabilityDoc) => {
-    const data = availabilityDoc.data();
-    const timestamp = data.updatedAt as { toDate?: () => Date } | undefined;
-    return {
-      date: data.date as string,
-      userId: data.userId as string,
-      displayName: data.displayName as string,
-      busySlots: (data.busySlots ?? []) as PersonAvailability['busySlots'],
-      confidence: (data.confidence as string) ?? 'unknown',
-      updatedAt: timestamp?.toDate?.() ?? null,
-    };
-  });
+  return snapshot.docs.map((availabilityDoc) => parseAvailabilityDoc(availabilityDoc));
+}
+
+export function subscribeSchedulesForDates(
+  householdId: string,
+  dates: string[],
+  onChange: (schedules: Record<string, DaySchedule | null>) => void,
+  onError?: (error: Error) => void
+): Unsubscribe {
+  if (dates.length === 0) {
+    onChange({});
+    return () => {};
+  }
+
+  return onSnapshot(
+    query(
+      collection(db, 'households', householdId, 'schedules'),
+      where('date', 'in', dates)
+    ),
+    (snapshot) => {
+      const schedules = Object.fromEntries(dates.map((date) => [date, null])) as Record<
+        string,
+        DaySchedule | null
+      >;
+      for (const scheduleDoc of snapshot.docs) {
+        const schedule = scheduleDoc.data() as DaySchedule;
+        schedules[schedule.date] = schedule;
+      }
+      onChange(schedules);
+    },
+    (error) => onError?.(error)
+  );
+}
+
+export function subscribeAvailabilityForDates(
+  householdId: string,
+  dates: string[],
+  onChange: (uploads: UploadedAvailability[]) => void,
+  onError?: (error: Error) => void
+): Unsubscribe {
+  if (dates.length === 0) {
+    onChange([]);
+    return () => {};
+  }
+
+  return onSnapshot(
+    query(
+      collection(db, 'households', householdId, 'availability'),
+      where('date', 'in', dates)
+    ),
+    (snapshot) => {
+      onChange(snapshot.docs.map((availabilityDoc) => parseAvailabilityDoc(availabilityDoc)));
+    },
+    (error) => onError?.(error)
+  );
+}
+
+export function subscribeMyAvailability(
+  householdId: string,
+  onChange: (uploads: UploadedAvailability[]) => void,
+  onError?: (error: Error) => void
+): Unsubscribe {
+  const uid = requireUserId();
+
+  return onSnapshot(
+    query(
+      collection(db, 'households', householdId, 'availability'),
+      where('userId', '==', uid)
+    ),
+    (snapshot) => {
+      onChange(
+        snapshot.docs
+          .map((availabilityDoc) => parseAvailabilityDoc(availabilityDoc))
+          .sort((a, b) => b.date.localeCompare(a.date))
+      );
+    },
+    (error) => onError?.(error)
+  );
+}
+
+export function subscribeHouseholdMembers(
+  householdId: string,
+  onChange: (household: NonNullable<UserProfile['household']>) => void,
+  onError?: (error: Error) => void
+): Unsubscribe {
+  const householdRef = doc(db, 'households', householdId);
+  const membersQuery = query(collection(db, 'users'), where('householdId', '==', householdId));
+
+  let householdInviteCode: string | null = null;
+  let members: Array<{ userId: string; displayName: string }> = [];
+
+  const emit = () => {
+    if (!householdInviteCode && members.length === 0) {
+      return;
+    }
+    onChange({
+      id: householdId,
+      inviteCode: householdInviteCode,
+      members,
+    });
+  };
+
+  const unsubscribeHousehold = onSnapshot(
+    householdRef,
+    (snapshot) => {
+      householdInviteCode = snapshot.exists()
+        ? ((snapshot.data()?.inviteCode as string | null) ?? null)
+        : null;
+      emit();
+    },
+    (error) => onError?.(error)
+  );
+
+  const unsubscribeMembers = onSnapshot(
+    membersQuery,
+    (snapshot) => {
+      members = snapshot.docs.map((memberDoc) => ({
+        userId: memberDoc.id,
+        displayName: (memberDoc.data().displayName as string) ?? memberDoc.id,
+      }));
+      emit();
+    },
+    (error) => onError?.(error)
+  );
+
+  return () => {
+    unsubscribeHousehold();
+    unsubscribeMembers();
+  };
 }
 
 export async function deleteMyAvailability(householdId: string, date: string): Promise<void> {
