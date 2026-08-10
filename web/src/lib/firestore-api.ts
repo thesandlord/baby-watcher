@@ -403,6 +403,36 @@ export async function deleteMyAvailability(householdId: string, date: string): P
   await deleteDoc(doc(db, 'households', householdId, 'availability', `${date}_${uid}`));
 }
 
+const FIRESTORE_BATCH_LIMIT = 500;
+
+export async function deleteMyAvailabilityBefore(
+  householdId: string,
+  beforeDate: string
+): Promise<number> {
+  const uid = requireUserId();
+  const uploads = await listMyAvailability(householdId);
+  const toDelete = uploads.filter((upload) => upload.date < beforeDate);
+
+  if (toDelete.length === 0) {
+    return 0;
+  }
+
+  for (let index = 0; index < toDelete.length; index += FIRESTORE_BATCH_LIMIT) {
+    const chunk = toDelete.slice(index, index + FIRESTORE_BATCH_LIMIT);
+    const batch = writeBatch(db);
+
+    for (const upload of chunk) {
+      batch.delete(
+        doc(db, 'households', householdId, 'availability', `${upload.date}_${uid}`)
+      );
+    }
+
+    await batch.commit();
+  }
+
+  return toDelete.length;
+}
+
 export async function getSchedule(householdId: string, date: string): Promise<DaySchedule | null> {
   const scheduleDoc = await getDoc(doc(db, 'households', householdId, 'schedules', date));
   if (!scheduleDoc.exists()) {

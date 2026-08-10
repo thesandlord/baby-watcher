@@ -7,10 +7,12 @@ import {
   dragSlot,
   expectMembersInProfile,
   generateDay,
+  goToDate,
   joinHousehold,
   openProfile,
   overrideSlot,
   signUp,
+  switchToThreeDayView,
   uniqueEmail,
   uploadAvailability,
   waitForAppIdle,
@@ -36,7 +38,7 @@ test('two players share generation, overrides, swaps, uploads, and regeneration'
     await expectMembersInProfile(alice, ['Alice', 'Bob']);
     await expectMembersInProfile(bob, ['Alice', 'Bob']);
 
-    await expect(alice.getByRole('heading', { level: 1 })).toHaveText('Aug 10-15');
+    await expect(alice.getByTestId('view-heading')).toHaveText('Tuesday, Aug 11');
     await expect(alice.getByTestId(`slot-${TEST_DATE}-08:00`)).toHaveCount(0);
     await expect(alice.getByTestId(`generate-${TEST_DATE}`)).toHaveText('Generate slots');
     await expect(alice.getByTestId(`upload-status-${TEST_DATE}`)).toHaveText('0/2 uploaded');
@@ -101,6 +103,8 @@ test('two players share generation, overrides, swaps, uploads, and regeneration'
     await expect(alice.getByTestId(`slot-${TEST_DATE}-08:30`)).toContainText('Alice');
 
     await generateDay(alice, NEXT_DATE);
+    await goToDate(alice, TEST_DATE);
+    await switchToThreeDayView(alice);
     await overrideSlot(alice, TEST_DATE, '08:30', 'Alice');
     await overrideSlot(alice, NEXT_DATE, '08:00', 'Bob');
     await dragSlot(
@@ -112,6 +116,7 @@ test('two players share generation, overrides, swaps, uploads, and regeneration'
     await expect(alice.getByTestId(`slot-${NEXT_DATE}-08:00`)).toContainText('Alice');
 
     await bob.reload();
+    await switchToThreeDayView(bob);
     await expect(bob.getByTestId(`slot-${TEST_DATE}-08:30`)).toContainText('Bob');
     await expect(bob.getByTestId(`slot-${NEXT_DATE}-08:00`)).toContainText('Alice');
 
@@ -152,11 +157,12 @@ test('two players share generation, overrides, swaps, uploads, and regeneration'
     await expect(bob.getByTestId(`upload-${TEST_DATE}`)).toBeVisible();
     await closeProfile(bob);
 
-    const initialRange = await alice.getByRole('heading', { level: 1 }).textContent();
-    await alice.getByRole('button', { name: 'Next week' }).click();
-    await expect(alice.getByRole('heading', { level: 1 })).not.toHaveText(initialRange!);
+    await goToDate(alice, TEST_DATE);
+    await expect(alice.getByTestId('day-board')).toHaveAttribute('data-date', TEST_DATE);
+    await alice.getByRole('button', { name: 'Next day' }).click();
+    await expect(alice.getByTestId('day-board')).not.toHaveAttribute('data-date', TEST_DATE);
     await alice.getByRole('button', { name: 'Today' }).click();
-    await expect(alice.getByTestId(`day-${TEST_DATE}`)).toHaveClass(/active/);
+    await expect(alice.getByTestId('day-board')).toHaveAttribute('data-date', TEST_DATE);
   } finally {
     await aliceContext.close();
     await bobContext.close();

@@ -11,13 +11,13 @@ type ProcessingPhase = 'idle' | 'reading' | 'saving' | 'success';
 interface UploadMeetingsButtonProps {
   profile: UserProfile;
   selectedDate: string;
-  weekDates: string[];
+  viewDates: string[];
 }
 
 export function UploadMeetingsButton({
   profile,
   selectedDate,
-  weekDates,
+  viewDates,
 }: UploadMeetingsButtonProps) {
   const cameraInputRef = useRef<HTMLInputElement>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
@@ -25,7 +25,7 @@ export function UploadMeetingsButton({
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [manualDate, setManualDate] = useState(selectedDate);
-  const [manualWeekStart, setManualWeekStart] = useState(weekDates[0] ?? selectedDate);
+  const [manualWeekStart, setManualWeekStart] = useState(viewDates[0] ?? selectedDate);
   const [needsDateConfirmation, setNeedsDateConfirmation] = useState(false);
   const [needsWeekConfirmation, setNeedsWeekConfirmation] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -42,7 +42,7 @@ export function UploadMeetingsButton({
     setNeedsDateConfirmation(false);
     setNeedsWeekConfirmation(false);
     setManualDate(selectedDate);
-    setManualWeekStart(weekDates[0] ?? selectedDate);
+    setManualWeekStart(viewDates[0] ?? selectedDate);
     setSubmitting(false);
     setProcessingPhase('idle');
     setModalError(null);
@@ -53,7 +53,7 @@ export function UploadMeetingsButton({
   function openUploadModal() {
     setOpen(true);
     setManualDate(selectedDate);
-    setManualWeekStart(weekDates[0] ?? selectedDate);
+    setManualWeekStart(viewDates[0] ?? selectedDate);
     setNeedsDateConfirmation(false);
     setNeedsWeekConfirmation(false);
     setModalError(null);
@@ -138,7 +138,7 @@ export function UploadMeetingsButton({
         const mimeType = file?.type || 'image/jpeg';
         extraction = await extractCalendarFromImage(imageBase64, mimeType, {
           hintedDate: options?.dateOverride ?? selectedDate,
-          weekDates: options?.dateOverride ? undefined : weekDates,
+          weekDates: options?.dateOverride ? undefined : viewDates,
         });
       }
 
@@ -146,7 +146,7 @@ export function UploadMeetingsButton({
         if (extraction.needsDateConfirmation && !options?.weekStartOverride) {
           setPendingExtraction(extraction);
           setNeedsWeekConfirmation(true);
-          setManualWeekStart(extraction.weekStart ?? weekDates[0] ?? selectedDate);
+          setManualWeekStart(extraction.weekStart ?? viewDates[0] ?? selectedDate);
           setProcessingPhase('idle');
           return;
         }

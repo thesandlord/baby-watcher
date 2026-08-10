@@ -498,8 +498,8 @@ button {
 
 .week-grid {
   display: grid;
-  grid-template-columns: 4.8rem repeat(5, minmax(175px, 1fr));
-  min-width: 952px;
+  grid-template-columns: 4.8rem repeat(var(--day-count, 5), minmax(175px, 1fr));
+  min-width: max(640px, calc(4.8rem + var(--day-count, 5) * 175px));
 }
 
 .week-grid-row {
@@ -737,6 +737,208 @@ button {
   padding: 0.7rem 1rem;
   color: var(--text-muted);
   font-size: 0.85rem;
+}
+
+.view-mode-toggle {
+  display: inline-flex;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  overflow: hidden;
+  background: var(--surface-muted);
+}
+
+.view-mode-button {
+  border: 0;
+  padding: 0.45rem 0.75rem;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+.view-mode-button.active {
+  background: var(--accent);
+  color: white;
+}
+
+.day-board-wrapper {
+  position: relative;
+  overflow-x: auto;
+}
+
+.day-board {
+  display: grid;
+  grid-template-rows: auto auto 1fr;
+  min-width: min(100%, 960px);
+}
+
+.day-board-header,
+.day-board-actions,
+.day-board-body {
+  display: grid;
+  grid-template-columns: 4.8rem repeat(var(--member-count, 1), minmax(120px, 1fr)) 4px minmax(160px, 1.15fr);
+}
+
+.day-board-header {
+  position: sticky;
+  top: 0;
+  z-index: 4;
+}
+
+.day-corner,
+.day-actions-label,
+.day-time-column {
+  position: sticky;
+  left: 0;
+  z-index: 3;
+  background: var(--surface-strong);
+}
+
+.day-corner,
+.day-member-header,
+.day-watch-header {
+  min-height: 4rem;
+  border-bottom: 1px solid var(--border);
+  background: color-mix(in srgb, var(--surface-strong) 94%, transparent);
+  backdrop-filter: blur(12px);
+}
+
+.day-member-header {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  padding: 0.65rem 0.75rem;
+  border-left: 1px solid var(--border);
+}
+
+.day-member-name {
+  font-size: 0.82rem;
+  font-weight: 700;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.day-watch-header,
+.day-watch-actions {
+  border-left: 1px solid var(--border);
+}
+
+.day-watch-header {
+  display: grid;
+  place-content: center;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.day-watch-divider {
+  background: color-mix(in srgb, var(--border) 80%, var(--accent) 20%);
+}
+
+.day-watch-divider-body {
+  min-height: 100%;
+}
+
+.day-board-actions {
+  border-bottom: 1px solid var(--border);
+}
+
+.day-actions-label,
+.day-member-action-spacer,
+.day-watch-actions {
+  min-height: 4rem;
+  background: var(--surface-strong);
+}
+
+.day-actions-label {
+  display: grid;
+  place-content: center;
+  color: var(--text-muted);
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.day-member-action-spacer {
+  border-left: 1px solid var(--border);
+}
+
+.day-watch-actions {
+  display: grid;
+  grid-template-rows: auto auto;
+  gap: 0.35rem;
+  padding: 0.55rem;
+}
+
+.day-board-body {
+  align-items: stretch;
+}
+
+.day-time-column {
+  border-right: 1px solid var(--border);
+}
+
+.day-time-label {
+  min-height: 3rem;
+  padding: 0.35rem 0.5rem 0;
+  color: var(--text-muted);
+  border-bottom: 1px solid var(--border);
+  font-size: 0.72rem;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.day-meetings-column {
+  border-left: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+}
+
+.day-meetings-track {
+  position: relative;
+  height: 100%;
+}
+
+.day-meeting-block {
+  position: absolute;
+  left: 0.25rem;
+  right: 0.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  overflow: hidden;
+  border: 1px solid color-mix(in srgb, var(--meeting-accent) 45%, transparent);
+  border-left: 4px solid var(--meeting-accent);
+  border-radius: 0.42rem;
+  padding: 0.35rem 0.45rem;
+  background: color-mix(in srgb, var(--meeting-accent) 18%, var(--surface-strong));
+}
+
+.day-meeting-time {
+  font-size: 0.68rem;
+  font-weight: 700;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.day-meeting-title {
+  font-size: 0.76rem;
+  font-weight: 700;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.day-watch-column {
+  border-left: 1px solid var(--border);
+}
+
+.day-watch-cell {
+  min-height: 3rem;
+  padding: 0.18rem;
+  border-bottom: 1px solid var(--border);
 }
 
 .assignment-options {

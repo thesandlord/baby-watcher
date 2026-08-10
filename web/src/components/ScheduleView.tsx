@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode, type RefObject } from 'react';
+import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import {
   DndContext,
   PointerSensor,
@@ -21,31 +21,37 @@ import {
   currentTimeLineFraction,
   formatDisplayDate,
   formatSlotTime,
-  formatWeekRange,
+  formatViewHeading,
   todayIsoDate,
+  type ScheduleViewMode,
   type UserProfile,
 } from '../lib/utils';
 import type { UploadedAvailability } from '../lib/firestore-api';
+import { DayScheduleBoard } from './DayScheduleBoard';
 import { HouseholdMenu } from './HouseholdMenu';
+import { CurrentTimeLine } from './CurrentTimeLine';
 
 interface ScheduleViewProps {
   profile: UserProfile;
   schedules: Record<string, DaySchedule | null>;
-  weekDates: string[];
+  viewDates: string[];
   activeDate: string;
+  viewMode: ScheduleViewMode;
   uploads: UploadedAvailability[];
   householdUploads: UploadedAvailability[];
   busy: boolean;
   error: string | null;
   uploadMeetingsButton: ReactNode;
   onActiveDateChange: (date: string) => void;
-  onPreviousWeek: () => void;
-  onNextWeek: () => void;
+  onViewModeChange: (mode: ScheduleViewMode) => void;
+  onPreviousPeriod: () => void;
+  onNextPeriod: () => void;
   onToday: () => void;
   onGenerate: (date: string) => void;
   onSwap: (sourceDate: string, sourceStart: string, targetDate: string, targetStart: string) => void;
   onAssign: (date: string, start: string, watcherId: string | null) => void;
   onDeleteUpload: (date: string) => void;
+  onCleanupOldUploads: () => void;
   onSignOut: () => void;
 }
 
@@ -104,98 +110,27 @@ function SlotCell({ date, slot, memberIds, disabled, onClick }: SlotCellProps) {
   );
 }
 
-interface CurrentTimeLineProps {
-  visible: boolean;
-  fraction: number;
-  gridRef: RefObject<HTMLDivElement | null>;
-  slotsStartRef: RefObject<HTMLDivElement | null>;
-  slotsEndRef: RefObject<HTMLDivElement | null>;
-  todayColumnRef: RefObject<HTMLDivElement | null>;
-}
-
-function CurrentTimeLine({
-  visible,
-  fraction,
-  gridRef,
-  slotsStartRef,
-  slotsEndRef,
-  todayColumnRef,
-}: CurrentTimeLineProps) {
-  const [style, setStyle] = useState<CSSProperties | null>(null);
-
-  useLayoutEffect(() => {
-    if (!visible) {
-      setStyle(null);
-      return;
-    }
-
-    function measure() {
-      const grid = gridRef.current;
-      const slotsStart = slotsStartRef.current;
-      const slotsEnd = slotsEndRef.current;
-      const todayColumn = todayColumnRef.current;
-      if (!grid || !slotsStart || !slotsEnd || !todayColumn) {
-        setStyle(null);
-        return;
-      }
-
-      const gridRect = grid.getBoundingClientRect();
-      const slotsTop = slotsStart.getBoundingClientRect().top - gridRect.top;
-      const slotsHeight =
-        slotsEnd.getBoundingClientRect().bottom - slotsStart.getBoundingClientRect().top;
-      const columnRect = todayColumn.getBoundingClientRect();
-
-      setStyle({
-        top: slotsTop + fraction * slotsHeight,
-        left: columnRect.left - gridRect.left,
-        width: columnRect.width,
-      });
-    }
-
-    measure();
-    const observer = new ResizeObserver(measure);
-    if (gridRef.current) {
-      observer.observe(gridRef.current);
-    }
-    window.addEventListener('resize', measure);
-    return () => {
-      observer.disconnect();
-      window.removeEventListener('resize', measure);
-    };
-  }, [visible, fraction, gridRef, slotsStartRef, slotsEndRef, todayColumnRef]);
-
-  if (!visible || !style) {
-    return null;
-  }
-
-  return (
-    <div
-      className="week-now-line"
-      style={style}
-      aria-hidden="true"
-      data-testid="current-time-line"
-    />
-  );
-}
-
 export function ScheduleView({
   profile,
   schedules,
-  weekDates,
+  viewDates,
   activeDate,
+  viewMode,
   uploads,
   householdUploads,
   busy,
   error,
   uploadMeetingsButton,
   onActiveDateChange,
-  onPreviousWeek,
-  onNextWeek,
+  onViewModeChange,
+  onPreviousPeriod,
+  onNextPeriod,
   onToday,
   onGenerate,
   onSwap,
   onAssign,
   onDeleteUpload,
+  onCleanupOldUploads,
   onSignOut,
 }: ScheduleViewProps) {
   const memberIds = profile.household?.members.map((member) => member.userId) ?? [];
@@ -206,7 +141,7 @@ export function ScheduleView({
     useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
     useSensor(TouchSensor, { activationConstraint: { delay: 200, tolerance: 6 } })
   );
-  const firstSchedule = weekDates.map((date) => schedules[date]).find(Boolean);
+  const firstSchedule = viewDates.map((date) => schedules[date]).find(Boolean);
   const timeSlots = firstSchedule?.slots ?? generateTimeSlots(WORKDAY_START, WORKDAY_END, 30);
   const gridWrapperRef = useRef<HTMLDivElement>(null);
   const slotsStartRef = useRef<HTMLDivElement>(null);
@@ -215,7 +150,7 @@ export function ScheduleView({
   const [now, setNow] = useState(() => new Date());
   const today = todayIsoDate();
   const nowLineFraction = currentTimeLineFraction(now, WORKDAY_START, WORKDAY_END);
-  const showNowLine = weekDates.includes(today) && nowLineFraction !== null;
+  const showNowLine = viewDates.includes(today) && nowLineFraction !== null;
 
   useEffect(() => {
     const intervalId = window.setInterval(() => setNow(new Date()), 60_000);
@@ -231,20 +166,56 @@ export function ScheduleView({
     onSwap(sourceDate, sourceStart, targetDate, targetStart);
   }
 
+  function renderSlotCell(props: SlotCellProps) {
+    return <SlotCell {...props} />;
+  }
+
   return (
     <>
       <div className="schedule-header week-toolbar">
         <div className="schedule-meta">
-          <h1 className="hero-title">{formatWeekRange(weekDates)}</h1>
+          <h1 className="hero-title" data-testid="view-heading">
+            {formatViewHeading(viewDates)}
+          </h1>
         </div>
         <div className="week-toolbar-actions">
+          <div className="view-mode-toggle" role="group" aria-label="Calendar view mode">
+            <button
+              type="button"
+              className={`view-mode-button${viewMode === 'day' ? ' active' : ''}`}
+              data-testid="view-mode-day"
+              aria-pressed={viewMode === 'day'}
+              onClick={() => onViewModeChange('day')}
+            >
+              1 day
+            </button>
+            <button
+              type="button"
+              className={`view-mode-button${viewMode === 'three-day' ? ' active' : ''}`}
+              data-testid="view-mode-three-day"
+              aria-pressed={viewMode === 'three-day'}
+              onClick={() => onViewModeChange('three-day')}
+            >
+              3 days
+            </button>
+          </div>
           <button type="button" className="ghost-button today-button" onClick={onToday}>
             Today
           </button>
-          <button type="button" className="icon-button" onClick={onPreviousWeek} aria-label="Previous week">
+          <button
+            type="button"
+            className="icon-button"
+            onClick={onPreviousPeriod}
+            aria-label={viewMode === 'day' ? 'Previous day' : 'Previous 3 days'}
+          >
             ‹
           </button>
-          <button type="button" className="icon-button" onClick={onNextWeek} aria-label="Next week">
+          <button
+            type="button"
+            className="icon-button"
+            onClick={onNextPeriod}
+            aria-label={viewMode === 'day' ? 'Next day' : 'Next 3 days'}
+          >
             ›
           </button>
           {uploadMeetingsButton}
@@ -263,110 +234,132 @@ export function ScheduleView({
 
       <DndContext sensors={sensors} onDragEnd={handleDragEnd}>
         <div className="week-scroll">
-          <div className="week-grid-wrapper" ref={gridWrapperRef}>
-            <div className="week-grid" data-testid="week-grid">
-              <div className="week-corner" />
-              {weekDates.map((date) => {
-                const parsed = new Date(`${date}T12:00:00`);
-                const isToday = date === today;
-                return (
-                  <button
-                    key={date}
-                    type="button"
-                    data-testid={`day-${date}`}
-                    data-date={date}
-                    className={`week-day-header${activeDate === date ? ' active' : ''}${isToday ? ' today' : ''}`}
-                    onClick={() => onActiveDateChange(date)}
-                  >
-                    <span>{parsed.toLocaleDateString(undefined, { weekday: 'short' })}</span>
-                    <strong>{parsed.getDate()}</strong>
-                  </button>
-                );
-              })}
-
-              <div className="week-footer-label">Slots</div>
-              {weekDates.map((date) => {
-                const uploadedCount = new Set(
-                  householdUploads
-                    .filter((upload) => upload.date === date)
-                    .map((upload) => upload.userId)
-                ).size;
-                return (
-                  <div className="week-day-action" key={date}>
-                    <button
-                      type="button"
-                      data-testid={`generate-${date}`}
-                      className={schedules[date] ? 'ghost-button generate-button' : 'primary-button generate-button'}
-                      disabled={busy}
-                      onClick={() => onGenerate(date)}
-                    >
-                      {schedules[date] ? 'Regenerate' : 'Generate slots'}
-                    </button>
-                    <button
-                      type="button"
-                      data-testid={`upload-status-${date}`}
-                      className="upload-status-button"
-                      aria-label={`View upload status for ${formatDisplayDate(date)}`}
-                      onClick={() => setUploadStatusDate(date)}
-                    >
-                      {uploadedCount}/{memberIds.length} uploaded
-                    </button>
-                  </div>
-                );
-              })}
-
-              {timeSlots.map((timeSlot, rowIndex) => (
-                <div className="week-grid-row" key={timeSlot.start}>
-                  <div
-                    className="week-time"
-                    ref={
-                      rowIndex === 0
-                        ? slotsStartRef
-                        : rowIndex === timeSlots.length - 1
-                          ? slotsEndRef
-                          : undefined
-                    }
-                  >
-                    {formatSlotTime(timeSlot.start)}
-                  </div>
-                  {weekDates.map((date) => {
-                    const slot = schedules[date]?.slots[rowIndex];
-                    return (
-                      <div
-                        className="week-cell"
-                        key={`${date}-${timeSlot.start}`}
-                        ref={date === today && rowIndex === 0 ? todayColumnRef : undefined}
-                      >
-                        {slot ? (
-                          <SlotCell
-                            date={date}
-                            slot={slot}
-                            memberIds={memberIds}
-                            disabled={busy}
-                            onClick={() => {
-                              onActiveDateChange(date);
-                              setEditing({ date, slot });
-                            }}
-                          />
-                        ) : null}
-                      </div>
-                    );
-                  })}
-                </div>
-              ))}
-            </div>
-            <CurrentTimeLine
-              visible={showNowLine}
-              fraction={nowLineFraction ?? 0}
-              gridRef={gridWrapperRef}
-              slotsStartRef={slotsStartRef}
-              slotsEndRef={slotsEndRef}
-              todayColumnRef={todayColumnRef}
+          {viewMode === 'day' ? (
+            <DayScheduleBoard
+              date={activeDate}
+              profile={profile}
+              schedule={schedules[activeDate] ?? null}
+              householdUploads={householdUploads}
+              timeSlots={timeSlots}
+              memberIds={memberIds}
+              busy={busy}
+              showNowLine={showNowLine}
+              nowLineFraction={nowLineFraction ?? 0}
+              onGenerate={onGenerate}
+              onUploadStatus={setUploadStatusDate}
+              onEditSlot={(date, slot) => setEditing({ date, slot })}
+              renderSlotCell={renderSlotCell}
             />
-          </div>
+          ) : (
+            <div className="week-grid-wrapper" ref={gridWrapperRef}>
+              <div
+                className="week-grid"
+                data-testid="week-grid"
+                style={{ '--day-count': viewDates.length } as CSSProperties}
+              >
+                <div className="week-corner" />
+                {viewDates.map((date) => {
+                  const parsed = new Date(`${date}T12:00:00`);
+                  const isToday = date === today;
+                  return (
+                    <button
+                      key={date}
+                      type="button"
+                      data-testid={`day-${date}`}
+                      data-date={date}
+                      className={`week-day-header${activeDate === date ? ' active' : ''}${isToday ? ' today' : ''}`}
+                      onClick={() => onActiveDateChange(date)}
+                    >
+                      <span>{parsed.toLocaleDateString(undefined, { weekday: 'short' })}</span>
+                      <strong>{parsed.getDate()}</strong>
+                    </button>
+                  );
+                })}
+
+                <div className="week-footer-label">Slots</div>
+                {viewDates.map((date) => {
+                  const uploadedCount = new Set(
+                    householdUploads
+                      .filter((upload) => upload.date === date)
+                      .map((upload) => upload.userId)
+                  ).size;
+                  return (
+                    <div className="week-day-action" key={date}>
+                      <button
+                        type="button"
+                        data-testid={`generate-${date}`}
+                        className={schedules[date] ? 'ghost-button generate-button' : 'primary-button generate-button'}
+                        disabled={busy}
+                        onClick={() => onGenerate(date)}
+                      >
+                        {schedules[date] ? 'Regenerate' : 'Generate slots'}
+                      </button>
+                      <button
+                        type="button"
+                        data-testid={`upload-status-${date}`}
+                        className="upload-status-button"
+                        aria-label={`View upload status for ${formatDisplayDate(date)}`}
+                        onClick={() => setUploadStatusDate(date)}
+                      >
+                        {uploadedCount}/{memberIds.length} uploaded
+                      </button>
+                    </div>
+                  );
+                })}
+
+                {timeSlots.map((timeSlot, rowIndex) => (
+                  <div className="week-grid-row" key={timeSlot.start}>
+                    <div
+                      className="week-time"
+                      ref={
+                        rowIndex === 0
+                          ? slotsStartRef
+                          : rowIndex === timeSlots.length - 1
+                            ? slotsEndRef
+                            : undefined
+                      }
+                    >
+                      {formatSlotTime(timeSlot.start)}
+                    </div>
+                    {viewDates.map((date) => {
+                      const slot = schedules[date]?.slots[rowIndex];
+                      return (
+                        <div
+                          className="week-cell"
+                          key={`${date}-${timeSlot.start}`}
+                          ref={date === today && rowIndex === 0 ? todayColumnRef : undefined}
+                        >
+                          {slot ? (
+                            renderSlotCell({
+                              date,
+                              slot,
+                              memberIds,
+                              disabled: busy,
+                              onClick: () => {
+                                onActiveDateChange(date);
+                                setEditing({ date, slot });
+                              },
+                            })
+                          ) : null}
+                        </div>
+                      );
+                    })}
+                  </div>
+                ))}
+              </div>
+              <CurrentTimeLine
+                visible={showNowLine}
+                fraction={nowLineFraction ?? 0}
+                gridRef={gridWrapperRef}
+                slotsStartRef={slotsStartRef}
+                slotsEndRef={slotsEndRef}
+                todayColumnRef={todayColumnRef}
+              />
+            </div>
+          )}
           {!firstSchedule && !busy ? (
             <div className="week-empty-hint">
-              Upload availability, then generate slots under each day.
+              Upload availability, then generate watch slots for this day.
             </div>
           ) : null}
         </div>
@@ -379,6 +372,7 @@ export function ScheduleView({
         open={menuOpen}
         onClose={() => setMenuOpen(false)}
         onDeleteUpload={onDeleteUpload}
+        onCleanupOldUploads={onCleanupOldUploads}
         onSelectUploadDate={(date) => {
           onActiveDateChange(date);
           setMenuOpen(false);
