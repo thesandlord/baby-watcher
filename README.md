@@ -75,8 +75,7 @@ To use real OpenRouter extraction locally, set `VITE_MOCK_CALENDAR_EXTRACTION=fa
 
 ### Automatic (recommended)
 
-- **Pull requests** — CI deploys Firestore rules and indexes automatically.
-- **`main` merges** — production deploy to Firebase Hosting; Firestore rules and indexes deploy via CI as well.
+- **`main` merges** — production deploy to Firebase Hosting + Firestore rules.
 
 See [docs/deploy.md](docs/deploy.md) for the full list of GitHub secrets to configure.
 

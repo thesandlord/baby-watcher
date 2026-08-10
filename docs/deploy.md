@@ -2,18 +2,9 @@
 
 ## Production
 
-Production hosting deploys run automatically via GitHub Actions when changes merge to `main`.
+Production deploys run automatically via GitHub Actions when changes merge to `main`.
 
 Workflow: [`.github/workflows/deploy.yml`](../.github/workflows/deploy.yml)
-
-## Firestore rules and indexes
-
-Firestore rules and indexes deploy automatically on every pull request and on pushes to `main`.
-
-Workflow: [`.github/workflows/firestore-rules.yml`](../.github/workflows/firestore-rules.yml)
-
-- Uses the same Firebase project and `FIREBASE_SERVICE_ACCOUNT` secret as production
-- Deploys `firestore.rules` and `firestore.indexes.json`
 
 ## One-time Firebase setup
 
@@ -60,5 +51,5 @@ You can also run the workflow manually from the **Actions** tab via **workflow_d
 
 ## What gets deployed
 
-- **Firebase Hosting** — built Astro app from `web/dist` (production workflow on `main`)
-- **Firestore rules and indexes** — `firestore.rules` and `firestore.indexes.json` (pull requests and `main`)
+- **Firebase Hosting** — built Astro app from `web/dist`
+- **Firestore rules** — `firestore.rules` and indexes
