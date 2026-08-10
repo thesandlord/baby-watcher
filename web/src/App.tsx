@@ -19,7 +19,6 @@ import {
   subscribeHouseholdMembers,
   subscribeMyAvailability,
   subscribeSchedulesForDates,
-  swapScheduleAssignments,
   updateScheduleAssignment,
   upsertMemberAvailabilityBusySlots,
   type UploadedAvailability,
@@ -182,30 +181,6 @@ function AppContent() {
     }
   }
 
-  async function handleSwap(
-    sourceDate: string,
-    sourceStart: string,
-    targetDate: string,
-    targetStart: string
-  ) {
-    if (!profile?.household || !schedules[sourceDate] || !schedules[targetDate]) {
-      return;
-    }
-    setBusy(true);
-    setError(null);
-    try {
-      await swapScheduleAssignments(
-        profile.household.id,
-        { date: sourceDate, start: sourceStart },
-        { date: targetDate, start: targetStart }
-      );
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to swap slots.');
-    } finally {
-      setBusy(false);
-    }
-  }
-
   async function handleUpdateBusySlots(
     date: string,
     userId: string,
@@ -336,9 +311,6 @@ function AppContent() {
         onNextPeriod={() => navigatePeriod(1)}
         onToday={() => selectDate(defaultActiveDate())}
         onGenerate={(date) => void handleGenerate(date)}
-        onSwap={(sourceDate, sourceStart, targetDate, targetStart) => {
-          void handleSwap(sourceDate, sourceStart, targetDate, targetStart);
-        }}
         onAssign={(date, start, watcherId) => void handleAssign(date, start, watcherId)}
         onUpdateBusySlots={(date, userId, busySlots) => void handleUpdateBusySlots(date, userId, busySlots)}
         onDeleteUpload={(date) => void handleDeleteUpload(date)}

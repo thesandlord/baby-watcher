@@ -4,7 +4,6 @@ import {
   TEST_DATE,
   closeProfile,
   createHousehold,
-  dragSlot,
   expectMembersInProfile,
   generateDay,
   goToDate,
@@ -18,7 +17,7 @@ import {
   waitForAppIdle,
 } from './helpers';
 
-test('two players share generation, overrides, swaps, uploads, and regeneration', async ({
+test('two players share generation, overrides, uploads, and regeneration', async ({
   browser,
 }) => {
   test.setTimeout(120_000);
@@ -92,26 +91,16 @@ test('two players share generation, overrides, swaps, uploads, and regeneration'
     await bob.reload();
     await expect(bob.getByTestId(`slot-${TEST_DATE}-08:00`)).toContainText('Bob');
 
-    await overrideSlot(alice, TEST_DATE, '08:00', 'Alice');
-    await overrideSlot(alice, TEST_DATE, '08:30', 'Bob');
-    await dragSlot(
-      alice,
-      { date: TEST_DATE, start: '08:00' },
-      { date: TEST_DATE, start: '08:30' }
-    );
+    await overrideSlot(alice, TEST_DATE, '08:00', 'Bob');
+    await overrideSlot(alice, TEST_DATE, '08:30', 'Alice');
     await expect(alice.getByTestId(`slot-${TEST_DATE}-08:00`)).toContainText('Bob');
     await expect(alice.getByTestId(`slot-${TEST_DATE}-08:30`)).toContainText('Alice');
 
     await generateDay(alice, NEXT_DATE);
     await goToDate(alice, TEST_DATE);
     await switchToThreeDayView(alice);
-    await overrideSlot(alice, TEST_DATE, '08:30', 'Alice');
-    await overrideSlot(alice, NEXT_DATE, '08:00', 'Bob');
-    await dragSlot(
-      alice,
-      { date: TEST_DATE, start: '08:30' },
-      { date: NEXT_DATE, start: '08:00' }
-    );
+    await overrideSlot(alice, TEST_DATE, '08:30', 'Bob');
+    await overrideSlot(alice, NEXT_DATE, '08:00', 'Alice');
     await expect(alice.getByTestId(`slot-${TEST_DATE}-08:30`)).toContainText('Bob');
     await expect(alice.getByTestId(`slot-${NEXT_DATE}-08:00`)).toContainText('Alice');
 

@@ -1,15 +1,5 @@
 import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import {
-  DndContext,
-  PointerSensor,
-  TouchSensor,
-  useDraggable,
-  useDroppable,
-  useSensor,
-  useSensors,
-  type DragEndEvent,
-} from '@dnd-kit/core';
-import {
   generateTimeSlots,
   SLOT_MINUTES,
   WORKDAY_END,
@@ -55,21 +45,11 @@ interface ScheduleViewProps {
   onNextPeriod: () => void;
   onToday: () => void;
   onGenerate: (date: string) => void;
-  onSwap: (sourceDate: string, sourceStart: string, targetDate: string, targetStart: string) => void;
   onAssign: (date: string, start: string, watcherId: string | null) => void;
   onUpdateBusySlots?: (date: string, userId: string, busySlots: BusySlot[]) => void;
   onDeleteUpload: (date: string) => void;
   onCleanupOldUploads: () => void;
   onSignOut: () => void;
-}
-
-function slotId(date: string, start: string): string {
-  return `${date}|${start}`;
-}
-
-function parseSlotId(id: string): [string, string] {
-  const [date, start] = id.split('|');
-  return [date, start];
 }
 
 interface SlotCellProps {
@@ -81,42 +61,28 @@ interface SlotCellProps {
 }
 
 function SlotCell({ date, slot, memberIds, disabled, onClick }: SlotCellProps) {
-  const id = slotId(date, slot.start);
-  const { attributes, listeners, setNodeRef: setDraggableRef, transform, isDragging } =
-    useDraggable({ id, disabled });
-  const { setNodeRef: setDroppableRef, isOver } = useDroppable({ id, disabled });
   const activation = useSlotActivation(onClick, disabled);
   const accent = slot.watcherId
     ? memberColor(slot.watcherId, memberIds)
     : 'var(--text-muted)';
   const style = {
     '--slot-accent': accent,
-    transform: transform ? `translate3d(${transform.x}px, ${transform.y}px, 0)` : undefined,
   } as CSSProperties;
 
   return (
     <button
-      ref={(node) => {
-        setDraggableRef(node);
-        setDroppableRef(node);
-      }}
       type="button"
       disabled={disabled}
       data-testid={`slot-${date}-${slot.start}`}
       data-date={date}
       data-start={slot.start}
       data-watcher-id={slot.watcherId ?? ''}
-      className={`week-slot${isDragging ? ' dragging' : ''}${isOver ? ' drag-over' : ''}`}
+      className="week-slot"
       style={style}
       aria-label={`${formatDisplayDate(date)}, ${formatSlotTime(slot.start)}: ${slot.watcherName}`}
-      {...attributes}
-      {...listeners}
       onDoubleClick={activation.onDoubleClick}
       onClick={activation.onClick}
-      onPointerDown={(event) => {
-        listeners?.onPointerDown?.(event);
-        activation.onPointerDown(event);
-      }}
+      onPointerDown={activation.onPointerDown}
       onPointerMove={activation.onPointerMove}
       onPointerUp={activation.onPointerUp}
       onPointerCancel={activation.onPointerCancel}
@@ -145,7 +111,6 @@ export function ScheduleView({
   onNextPeriod,
   onToday,
   onGenerate,
-  onSwap,
   onAssign,
   onUpdateBusySlots,
   onDeleteUpload,
@@ -157,10 +122,6 @@ export function ScheduleView({
   const [menuOpen, setMenuOpen] = useState(false);
   const [editing, setEditing] = useState<{ date: string; slot: ScheduleSlot } | null>(null);
   const [uploadStatusDate, setUploadStatusDate] = useState<string | null>(null);
-  const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
-    useSensor(TouchSensor, { activationConstraint: { delay: 550, tolerance: 8 } })
-  );
   const slotEditingDisabled = busy || !canEditSchedule;
   const firstSchedule = viewDates.map((date) => schedules[date]).find(Boolean);
   const timeSlots = firstSchedule?.slots ?? generateTimeSlots(WORKDAY_START, WORKDAY_END, SLOT_MINUTES);
@@ -181,15 +142,6 @@ export function ScheduleView({
     const intervalId = window.setInterval(() => setNow(new Date()), 60_000);
     return () => window.clearInterval(intervalId);
   }, []);
-
-  function handleDragEnd(event: DragEndEvent) {
-    if (!event.over || event.active.id === event.over.id) {
-      return;
-    }
-    const [sourceDate, sourceStart] = parseSlotId(String(event.active.id));
-    const [targetDate, targetStart] = parseSlotId(String(event.over.id));
-    onSwap(sourceDate, sourceStart, targetDate, targetStart);
-  }
 
   function renderSlotCell(props: SlotCellProps) {
     return <SlotCell {...props} />;
@@ -282,8 +234,7 @@ export function ScheduleView({
       {error ? <div className="error-banner">{error}</div> : null}
 
       <div className="schedule-scroll-area">
-        <DndContext sensors={sensors} onDragEnd={handleDragEnd}>
-          <div className="week-scroll">
+        <div className="week-scroll">
           {viewMode === 'day' ? (
             <DayScheduleBoard
               date={activeDate}
@@ -429,7 +380,6 @@ export function ScheduleView({
             </div>
           ) : null}
         </div>
-      </DndContext>
       </div>
 
       <HouseholdMenu

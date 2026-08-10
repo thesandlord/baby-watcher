@@ -9,7 +9,6 @@ import {
   type ScheduleSlot,
 } from '@baby-watcher/shared';
 import { memberColor, memberInitials } from '../lib/members';
-import { useSlotActivation } from '../lib/useSlotActivation';
 import { parseWallClockTime } from '../lib/timezone';
 import {
   formatDisplayDate,
@@ -22,7 +21,8 @@ import type { UploadedAvailability } from '../lib/firestore-api';
 import { CurrentTimeLine } from './CurrentTimeLine';
 
 const SLOT_HEIGHT_REM = 3;
-const DRAG_THRESHOLD_PX = 6;
+const DRAG_THRESHOLD_PX = 8;
+const HOLD_TO_DRAG_MS = 400;
 const MIN_MEETING_MINUTES = MEETING_GRID_MINUTES;
 
 const DEFAULT_MEETING_MINUTES = SLOT_MINUTES;
@@ -148,7 +148,7 @@ function shiftBusySlot(
   };
 }
 
-type InteractionMode = 'idle' | 'drag';
+type InteractionMode = 'idle' | 'pending' | 'drag';
 
 interface MeetingBlockProps {
   busySlot: BusySlot;
@@ -178,11 +178,30 @@ function MeetingBlock({
   onEdit,
 }: MeetingBlockProps) {
   const [dragOffsetY, setDragOffsetY] = useState(0);
-  const [interacting, setInteracting] = useState(false);
-  const startClientYRef = useRef(0);
+  const [dragging, setDragging] = useState(false);
   const modeRef = useRef<InteractionMode>('idle');
+  const startClientXRef = useRef(0);
+  const startClientYRef = useRef(0);
+  const pointerIdRef = useRef<number | null>(null);
+  const pointerTypeRef = useRef('mouse');
+  const holdTimerRef = useRef<number | null>(null);
+  const suppressClickRef = useRef(false);
   const blockRef = useRef<HTMLDivElement>(null);
-  const activation = useSlotActivation(onEdit, !editable || disabled);
+
+  function clearHoldTimer() {
+    if (holdTimerRef.current !== null) {
+      window.clearTimeout(holdTimerRef.current);
+      holdTimerRef.current = null;
+    }
+  }
+
+  function resetInteraction() {
+    clearHoldTimer();
+    modeRef.current = 'idle';
+    pointerIdRef.current = null;
+    setDragging(false);
+    setDragOffsetY(0);
+  }
 
   function finishDrag(deltaY: number) {
     if (!editable || disabled || trackHeight <= 0 || deltaY === 0) {
@@ -198,19 +217,92 @@ function MeetingBlock({
     onUpdateBusySlots(nextBusySlots);
   }
 
-  function resetInteraction() {
-    modeRef.current = 'idle';
-    setInteracting(false);
-    setDragOffsetY(0);
+  function armDrag() {
+    if (modeRef.current === 'drag') {
+      return;
+    }
+    modeRef.current = 'drag';
+    suppressClickRef.current = true;
+    setDragging(true);
+    if (pointerIdRef.current !== null) {
+      blockRef.current?.setPointerCapture(pointerIdRef.current);
+    }
+    if (typeof navigator !== 'undefined' && 'vibrate' in navigator) {
+      navigator.vibrate(12);
+    }
   }
 
-  function beginInteraction(event: React.PointerEvent) {
+  function handlePointerDown(event: React.PointerEvent) {
     if (!editable || disabled) {
       return;
     }
-    blockRef.current?.setPointerCapture(event.pointerId);
+    pointerIdRef.current = event.pointerId;
+    pointerTypeRef.current = event.pointerType;
+    startClientXRef.current = event.clientX;
     startClientYRef.current = event.clientY;
+    modeRef.current = 'pending';
+    suppressClickRef.current = false;
+    clearHoldTimer();
+
+    // Touch/pen: hold to drag so vertical pans keep scrolling the schedule.
+    if (event.pointerType !== 'mouse') {
+      holdTimerRef.current = window.setTimeout(() => {
+        holdTimerRef.current = null;
+        if (modeRef.current === 'pending') {
+          armDrag();
+        }
+      }, HOLD_TO_DRAG_MS);
+    }
+  }
+
+  function handlePointerMove(event: React.PointerEvent) {
+    if (modeRef.current === 'idle') {
+      return;
+    }
+
+    const deltaX = event.clientX - startClientXRef.current;
+    const deltaY = event.clientY - startClientYRef.current;
+
+    if (modeRef.current === 'pending') {
+      if (Math.hypot(deltaX, deltaY) <= DRAG_THRESHOLD_PX) {
+        return;
+      }
+      if (pointerTypeRef.current === 'mouse') {
+        armDrag();
+        setDragOffsetY(deltaY);
+        return;
+      }
+      // Touch moved before hold completed — treat as scroll, abandon drag.
+      clearHoldTimer();
+      modeRef.current = 'idle';
+      return;
+    }
+
+    if (modeRef.current === 'drag') {
+      setDragOffsetY(deltaY);
+    }
+  }
+
+  function handlePointerUp(event: React.PointerEvent) {
+    if (modeRef.current === 'drag') {
+      finishDrag(event.clientY - startClientYRef.current);
+      resetInteraction();
+      return;
+    }
+    clearHoldTimer();
     modeRef.current = 'idle';
+    pointerIdRef.current = null;
+  }
+
+  function handleClick() {
+    if (suppressClickRef.current) {
+      suppressClickRef.current = false;
+      return;
+    }
+    if (!editable || disabled) {
+      return;
+    }
+    onEdit();
   }
 
   const blockStyle = meetingBlockStyle(busySlot, metrics);
@@ -218,12 +310,12 @@ function MeetingBlock({
     return null;
   }
 
-  const isDragging = modeRef.current === 'drag' && interacting;
-
   return (
     <div
       ref={blockRef}
-      className={`day-meeting-block${editable ? ' editable' : ''}${isDragging ? ' dragging' : ''}`}
+      role={editable ? 'button' : undefined}
+      tabIndex={editable && !disabled ? 0 : undefined}
+      className={`day-meeting-block${editable ? ' editable' : ''}${dragging ? ' dragging' : ''}`}
       data-testid={`meeting-${memberUserId}-${busySlot.start}`}
       style={{
         ...blockStyle,
@@ -235,54 +327,21 @@ function MeetingBlock({
           ? `${busySlot.start}–${busySlot.end} · ${busySlot.title}`
           : `${busySlot.start}–${busySlot.end}`
       }
-      onDoubleClick={activation.onDoubleClick}
-      onClick={activation.onClick}
-      onPointerDown={
+      onClick={handleClick}
+      onKeyDown={
         editable && !disabled
           ? (event) => {
-              beginInteraction(event);
-              activation.onPointerDown(event);
-            }
-          : undefined
-      }
-      onPointerMove={
-        editable && !disabled
-          ? (event) => {
-              activation.onPointerMove(event);
-              const deltaY = event.clientY - startClientYRef.current;
-              if (modeRef.current === 'idle') {
-                if (Math.abs(deltaY) > DRAG_THRESHOLD_PX) {
-                  modeRef.current = 'drag';
-                  setInteracting(true);
-                }
-                return;
-              }
-              if (modeRef.current === 'drag') {
-                setDragOffsetY(deltaY);
+              if (event.key === 'Enter' || event.key === ' ') {
+                event.preventDefault();
+                onEdit();
               }
             }
           : undefined
       }
-      onPointerUp={
-        editable && !disabled
-          ? (event) => {
-              activation.onPointerUp();
-              if (modeRef.current === 'drag') {
-                const deltaY = event.clientY - startClientYRef.current;
-                finishDrag(deltaY);
-              }
-              resetInteraction();
-            }
-          : undefined
-      }
-      onPointerCancel={
-        editable && !disabled
-          ? () => {
-              activation.onPointerCancel();
-              resetInteraction();
-            }
-          : undefined
-      }
+      onPointerDown={editable && !disabled ? handlePointerDown : undefined}
+      onPointerMove={editable && !disabled ? handlePointerMove : undefined}
+      onPointerUp={editable && !disabled ? handlePointerUp : undefined}
+      onPointerCancel={editable && !disabled ? () => resetInteraction() : undefined}
     >
       <span className="day-meeting-time">
         {formatSlotTime(busySlot.start)}–{formatSlotTime(busySlot.end)}
