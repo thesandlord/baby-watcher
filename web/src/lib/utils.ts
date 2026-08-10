@@ -2,10 +2,10 @@ import {
   parseTime,
   WORKDAY_END,
   WORKDAY_START,
+  type DaySchedule,
   type ScheduleSlot,
 } from '@baby-watcher/shared';
 import {
-  APP_TIMEZONE,
   formatCalendarDate,
   formatWallClockTime,
   nowMinutesInAppTimezone,
