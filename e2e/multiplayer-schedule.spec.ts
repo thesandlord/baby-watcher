@@ -101,6 +101,8 @@ test('two players share generation, overrides, uploads, and regeneration', async
     await switchToThreeDayView(alice);
     await overrideSlot(alice, TEST_DATE, '08:30', 'Bob');
     await overrideSlot(alice, NEXT_DATE, '08:00', 'Alice');
+    // Selecting NEXT_DATE shifts the 3-day window; return so both dates are visible.
+    await goToDate(alice, TEST_DATE);
     await expect(alice.getByTestId(`slot-${TEST_DATE}-08:30`)).toContainText('Bob');
     await expect(alice.getByTestId(`slot-${NEXT_DATE}-08:00`)).toContainText('Alice');
 
