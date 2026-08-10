@@ -83,7 +83,7 @@ export function viewDatesFor(activeDate: string, mode: ScheduleViewMode): string
 
 export function formatViewHeading(dates: string[]): string {
   if (dates.length === 1) {
-    return formatCalendarDate(dates[0], { weekday: 'long' });
+    return '';
   }
 
   return formatWeekRange(dates);

@@ -38,7 +38,7 @@ test('two players share generation, overrides, swaps, uploads, and regeneration'
     await expectMembersInProfile(alice, ['Alice', 'Bob']);
     await expectMembersInProfile(bob, ['Alice', 'Bob']);
 
-    await expect(alice.getByTestId('view-heading')).toHaveText('Tuesday');
+    await expect(alice.getByTestId('view-heading')).toHaveText('');
     await expect(alice.getByTestId(`slot-${TEST_DATE}-08:00`)).toHaveCount(0);
     await expect(alice.getByTestId(`generate-${TEST_DATE}`)).toHaveText('Generate slots');
     await expect(alice.getByTestId(`upload-status-${TEST_DATE}`)).toHaveText('0/2 uploaded');

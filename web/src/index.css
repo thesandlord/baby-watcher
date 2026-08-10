@@ -300,6 +300,10 @@ button {
   margin-bottom: 0.65rem;
 }
 
+.week-toolbar-compact {
+  justify-content: flex-end;
+}
+
 .week-toolbar-actions {
   display: flex;
   align-items: center;

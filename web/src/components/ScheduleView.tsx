@@ -174,14 +174,20 @@ export function ScheduleView({
     return <SlotCell {...props} />;
   }
 
+  const viewHeading = formatViewHeading(viewDates);
+
   return (
     <>
-      <div className="schedule-header week-toolbar">
-        <div className="schedule-meta">
-          <h1 className="hero-title" data-testid="view-heading">
-            {formatViewHeading(viewDates)}
-          </h1>
-        </div>
+      <div className={`schedule-header week-toolbar${viewHeading ? '' : ' week-toolbar-compact'}`}>
+        {viewHeading ? (
+          <div className="schedule-meta">
+            <h1 className="hero-title" data-testid="view-heading">
+              {viewHeading}
+            </h1>
+          </div>
+        ) : (
+          <span data-testid="view-heading" hidden />
+        )}
         <div className="week-toolbar-actions">
           <div className="view-mode-toggle" role="group" aria-label="Calendar view mode">
             <button
