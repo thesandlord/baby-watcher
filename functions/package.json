@@ -5,12 +5,13 @@
   "type": "module",
   "main": "lib/index.js",
   "engines": {
-    "node": "22"
+    "node": "24"
   },
   "scripts": {
     "baml:generate": "baml-cli generate",
     "build": "npm run baml:generate && tsc",
     "build:watch": "tsc --watch",
+    "test": "npm run build && node --input-type=module --eval \"import('./lib/index.js').then((mod) => { if (!mod.extractCalendar) throw new Error('extractCalendar export missing'); console.log('functions startup ok'); })\"",
     "serve": "npm run build && firebase emulators:start --only functions",
     "deploy": "firebase deploy --only functions"
   },

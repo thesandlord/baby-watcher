@@ -73,4 +73,4 @@ gcloud projects add-iam-policy-binding PROJECT_ID \
 
 - **Firebase Hosting** — built Astro app from `web/dist`
 - **Firestore rules** — `firestore.rules` and indexes
-- **Cloud Functions** — `extractCalendar` callable (BAML + Gemini)
+- **Cloud Functions** — `extractCalendar` callable (BAML + Gemini), Node.js **24** runtime (`nodejs24`)
