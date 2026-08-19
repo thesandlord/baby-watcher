@@ -11,19 +11,40 @@ Workflow: [`.github/workflows/deploy.yml`](../.github/workflows/deploy.yml)
 1. Create a Firebase project for production.
 2. Enable **Authentication** (Email/Password + Google), **Firestore**, and **Functions**.
 3. Register a **Web app** in Firebase console and copy the config values.
-4. Create a **service account** for CI:
+4. As a project **Owner**, enable these Google Cloud APIs (Firebase CLI cannot enable them if the CI account lacks Service Usage permission):
+   - [Cloud Functions](https://console.cloud.google.com/apis/library/cloudfunctions.googleapis.com)
+   - [Cloud Build](https://console.cloud.google.com/apis/library/cloudbuild.googleapis.com)
+   - [Artifact Registry](https://console.cloud.google.com/apis/library/artifactregistry.googleapis.com)
+   - [Cloud Runtime Configuration](https://console.cloud.google.com/apis/library/runtimeconfig.googleapis.com)
+   - [Secret Manager](https://console.cloud.google.com/apis/library/secretmanager.googleapis.com)
+5. Create a **service account** for CI:
    - Google Cloud Console → IAM → Service Accounts
-   - Create key (JSON) for a account with Firebase deploy permissions
+   - Create key (JSON) for an account with Firebase deploy permissions
    - Recommended roles on the project:
-     - `Firebase Hosting Admin`
-     - `Firebase Rules Admin`
-     - `Cloud Datastore User` (for Firestore rules/indexes deploy)
-     - `Cloud Functions Admin` / `Service Account User` (for functions deploy)
-5. Set the Google AI API key used by calendar OCR:
+     - `Firebase Hosting Admin` (`roles/firebasehosting.admin`)
+     - `Firebase Rules Admin` (`roles/firebaserules.admin`)
+     - `Cloud Datastore User` (`roles/datastore.user`) — Firestore rules/indexes
+     - `Cloud Functions Admin` (`roles/cloudfunctions.admin`)
+     - `Service Account User` (`roles/iam.serviceAccountUser`)
+     - `Service Usage Admin` (`roles/serviceusage.serviceUsageAdmin`) — required so deploy can check/enable APIs (fixes `403 … runtimeconfig.googleapis.com`)
+     - `Cloud RuntimeConfig Admin` (`roles/runtimeconfig.admin`)
+     - `Artifact Registry Administrator` (`roles/artifactregistry.admin`)
+     - `Cloud Build Editor` (`roles/cloudbuild.builds.editor`)
+     - `Secret Manager Admin` (`roles/secretmanager.admin`) — for `GOOGLE_API_KEY` / function secrets
+6. Set the Google AI API key used by calendar OCR:
 
 ```bash
 firebase functions:secrets:set GOOGLE_API_KEY --project YOUR_PROJECT_ID
 ```
+
+### Fix: `403 Permission denied to get service [runtimeconfig.googleapis.com]`
+
+This means the GitHub Actions service account cannot query Service Usage for Runtime Config. Do both:
+
+1. Enable **Cloud Runtime Configuration API** in the project (link above) while signed in as Owner.
+2. Grant the CI service account **Service Usage Admin** and **Cloud RuntimeConfig Admin** (roles listed above).
+
+Then re-run the deploy workflow.
 
 ## GitHub secrets to configure
 
