@@ -1,7 +1,7 @@
-client<llm> GeminiFlash {
+client<llm> GeminiFlashLite {
   provider google-ai
   options {
-    model "gemini-3.5-flash"
+    model "gemini-3.5-flash-lite"
     api_key env.GOOGLE_API_KEY
     generationConfig {
       temperature 0

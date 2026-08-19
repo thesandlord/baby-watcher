@@ -28,7 +28,7 @@ class CalendarExtraction {
 }
 
 function ExtractCalendar(img: image, hints: string) -> CalendarExtraction {
-  client GeminiFlash
+  client GeminiFlashLite
   prompt #"
     {{ _.role("user") }}
     You extract calendar availability from a screenshot for baby-watching schedule planning.
