@@ -19,7 +19,7 @@
   "devDependencies": {
     "@playwright/test": "^1.62.1",
     "concurrently": "^9.1.2",
-    "firebase-tools": "^13.30.0"
+    "firebase-tools": "^15.27.0"
   },
   "engines": {
     "node": ">=24"
