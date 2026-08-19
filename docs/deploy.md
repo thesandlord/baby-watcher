@@ -19,6 +19,7 @@ Workflow: [`.github/workflows/deploy.yml`](../.github/workflows/deploy.yml)
      - `Firebase Rules Admin`
      - `Cloud Datastore User` (for Firestore rules/indexes deploy)
      - `Cloud Functions Admin` / `Service Account User` (for functions deploy)
+     - `Firebase Extensions Viewer` (required by Firebase CLI to list extension instances during functions deploy, even when the project uses no extensions)
 5. Set the Google AI API key used by calendar OCR:
 
 ```bash
@@ -53,6 +54,20 @@ Note: `VITE_FIREBASE_PROJECT_ID` is set automatically from `FIREBASE_PROJECT_ID`
 ## Manual deploy trigger
 
 You can also run the workflow manually from the **Actions** tab via **workflow_dispatch**.
+
+## Troubleshooting deploy failures
+
+### `firebaseextensions.googleapis.com` returns 403
+
+Firebase CLI lists extension instances whenever functions are deployed, even if this project defines no extensions. Grant the CI service account **`Firebase Extensions Viewer`** (`roles/firebaseextensions.viewer`) on the Firebase/GCP project, then re-run deploy.
+
+Example (replace `PROJECT_ID` and `SERVICE_ACCOUNT_EMAIL`):
+
+```bash
+gcloud projects add-iam-policy-binding PROJECT_ID \
+  --member="serviceAccount:SERVICE_ACCOUNT_EMAIL" \
+  --role="roles/firebaseextensions.viewer"
+```
 
 ## What gets deployed
 
