@@ -2,42 +2,47 @@
 
 Coordinate baby-watching coverage during the work day by uploading calendar screenshots and generating a fair, deterministic 8am–5pm schedule in 30-minute watch slots. Meeting times support 15-minute precision.
 
-Everything runs client-side: Firebase Auth + Firestore for data, OpenRouter for calendar extraction, and a shared deterministic scheduler in the browser.
+Firebase Auth + Firestore hold household data. Calendar screenshot OCR runs in a secure Cloud Function using Gemini 2.5 Flash-Lite with BAML structured outputs. Schedule generation stays deterministic in the shared package / browser.
 
 ## Features
 
 - Firebase Authentication (email/password and Google)
 - Shared households with invite codes
 - Calendar screenshot upload from mobile
-- Client-side OpenRouter vision LLM extraction of busy slots
+- Secure Cloud Function OCR (Gemini 2.5 Flash-Lite + BAML)
 - Deterministic schedule generation with load balancing
 - Mobile-first schedule UI with day picker and floating camera button
-- No Cloud Functions required
 
 ## Monorepo layout
 
 - `shared/` — schedule types and deterministic generator
 - `web/` — Astro app with React islands and direct Firestore access
+- `functions/` — Cloud Functions (calendar extraction via BAML + Gemini)
 
 ## Setup
 
-1. Create a Firebase project and enable Auth + Firestore.
-2. Copy `.env.example` to `web/.env.local` and fill in Firebase + OpenRouter values.
-3. Install dependencies:
+1. Create a Firebase project and enable Auth + Firestore + Functions.
+2. Copy `.env.example` to `web/.env.local` and fill in Firebase web config values.
+3. Set the Google AI API key as a Firebase secret (never in the client):
+
+```bash
+firebase functions:secrets:set GOOGLE_API_KEY --project YOUR_PROJECT_ID
+```
+
+4. Install dependencies:
 
 ```bash
 npm install
+npm install --prefix functions
 ```
 
-Calendar extraction uses OpenRouter's free router (`openrouter/free`), which picks an available free vision-capable model for each request.
-
-4. Run tests:
+5. Run tests:
 
 ```bash
 npm test
 ```
 
-5. Start local development:
+6. Start local development:
 
 ```bash
 npm run dev:web
@@ -55,7 +60,7 @@ This script:
 - Copies `web/.env.emulator.example` to `web/.env.local` if missing
 - Starts Firestore (8080) and Auth (9099) emulators with the demo project `demo-baby-watcher`
 - Starts Astro on http://localhost:4323
-- Enables mock calendar extraction so you can test uploads without an OpenRouter key
+- Enables mock calendar extraction so you can test uploads without a Google API key
 
 Seed a 3-member demo household (Alice, Bob, Carol) with availability + schedule:
 
@@ -69,21 +74,22 @@ Emulator UI: http://localhost:4000
 
 See [docs/local-dev.md](docs/local-dev.md) for emulator setup details (including Java requirement).
 
-To use real OpenRouter extraction locally, set `VITE_MOCK_CALENDAR_EXTRACTION=false` and add `VITE_OPENROUTER_API_KEY` in `web/.env.local`.
+To exercise the real OCR path locally, set `VITE_MOCK_CALENDAR_EXTRACTION=false`, run the functions emulator with `GOOGLE_API_KEY` available, and point the web app at it (`VITE_USE_FIREBASE_EMULATORS=true`).
 
 ## Deploy
 
 ### Automatic (recommended)
 
-- **`main` merges** — production deploy to Firebase Hosting + Firestore rules.
+- **`main` merges** — production deploy to Firebase Hosting, Firestore rules, and Cloud Functions.
 
-See [docs/deploy.md](docs/deploy.md) for the full list of GitHub secrets to configure.
+See [docs/deploy.md](docs/deploy.md) for the full list of GitHub secrets to configure. Ensure `GOOGLE_API_KEY` is set as a Firebase/GCP secret before the first functions deploy.
 
 ### Manual
 
 ```bash
 npm run build
-firebase deploy --only firestore,hosting --project YOUR_PROJECT_ID
+npm run build --prefix functions
+firebase deploy --only firestore,hosting,functions --project YOUR_PROJECT_ID
 ```
 
 ## How scheduling works
@@ -99,4 +105,4 @@ For each 30-minute watch slot from 08:00 to 17:00, the scheduler assigns the ava
 
 ## Security note
 
-The OpenRouter API key is configured in the client for simplicity. Restrict it by HTTP referrer in the OpenRouter dashboard, or swap to a small proxy later if you want to hide the key.
+The Google AI API key stays in Cloud Functions as a Firebase secret (`GOOGLE_API_KEY`). The web client never receives it; authenticated users call the `extractCalendar` callable instead.

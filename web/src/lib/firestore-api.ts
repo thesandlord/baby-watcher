@@ -17,6 +17,7 @@ import {
 import {
   generateSchedule,
   hashScheduleInput,
+  type BusySlot,
   type DaySchedule,
   type PersonAvailability,
   type ScheduleSlot,
@@ -32,6 +33,14 @@ export interface UploadedAvailability {
   busySlots: PersonAvailability['busySlots'];
   confidence: string;
   updatedAt: Date | null;
+}
+
+/** Strip empty/undefined titles so Firestore writes never include undefined fields. */
+function sanitizeBusySlots(slots: PersonAvailability['busySlots']): BusySlot[] {
+  return slots.map((slot) => {
+    const title = slot.title?.trim();
+    return title ? { start: slot.start, end: slot.end, title } : { start: slot.start, end: slot.end };
+  });
 }
 
 function parseAvailabilityDoc(
@@ -271,7 +280,7 @@ export async function saveAvailability(
     date,
     userId: uid,
     displayName,
-    busySlots,
+    busySlots: sanitizeBusySlots(busySlots),
     confidence,
     updatedAt: serverTimestamp(),
   });
@@ -298,7 +307,7 @@ export async function saveAvailabilityBatch(
       date: day.date,
       userId: uid,
       displayName,
-      busySlots: day.busySlots,
+      busySlots: sanitizeBusySlots(day.busySlots),
       confidence: day.confidence,
       updatedAt: serverTimestamp(),
     });
@@ -317,11 +326,13 @@ export async function upsertMemberAvailabilityBusySlots(
   const availabilityRef = doc(db, 'households', householdId, 'availability', `${date}_${userId}`);
   const availabilityDoc = await getDoc(availabilityRef);
 
+  const sanitizedBusySlots = sanitizeBusySlots(busySlots);
+
   if (availabilityDoc.exists()) {
     await setDoc(
       availabilityRef,
       {
-        busySlots,
+        busySlots: sanitizedBusySlots,
         updatedAt: serverTimestamp(),
       },
       { merge: true }
@@ -333,7 +344,7 @@ export async function upsertMemberAvailabilityBusySlots(
     date,
     userId,
     displayName,
-    busySlots,
+    busySlots: sanitizedBusySlots,
     confidence: 'manual',
     updatedAt: serverTimestamp(),
   });
