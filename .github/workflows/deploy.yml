@@ -47,6 +47,9 @@ jobs:
       - name: Build
         run: npm run build
 
+      - name: Verify Cloud Functions startup
+        run: npm test --prefix functions
+
       - name: Authenticate to Google Cloud
         uses: google-github-actions/auth@v3
         with:
