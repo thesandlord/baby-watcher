@@ -9,7 +9,7 @@ Workflow: [`.github/workflows/deploy.yml`](../.github/workflows/deploy.yml)
 ## One-time Firebase setup
 
 1. Create a Firebase project for production.
-2. Enable **Authentication** (Email/Password + Google) and **Firestore**.
+2. Enable **Authentication** (Email/Password + Google), **Firestore**, and **Functions**.
 3. Register a **Web app** in Firebase console and copy the config values.
 4. Create a **service account** for CI:
    - Google Cloud Console → IAM → Service Accounts
@@ -18,6 +18,12 @@ Workflow: [`.github/workflows/deploy.yml`](../.github/workflows/deploy.yml)
      - `Firebase Hosting Admin`
      - `Firebase Rules Admin`
      - `Cloud Datastore User` (for Firestore rules/indexes deploy)
+     - `Cloud Functions Admin` / `Service Account User` (for functions deploy)
+5. Set the Google AI API key used by calendar OCR:
+
+```bash
+firebase functions:secrets:set GOOGLE_API_KEY --project YOUR_PROJECT_ID
+```
 
 ## GitHub secrets to configure
 
@@ -41,9 +47,8 @@ Also create a **`production` environment** in GitHub (Settings → Environments)
 | `VITE_FIREBASE_STORAGE_BUCKET` | `{projectId}.appspot.com` or `{projectId}.firebasestorage.app` |
 | `VITE_FIREBASE_MESSAGING_SENDER_ID` | Firebase messaging sender ID |
 | `VITE_FIREBASE_APP_ID` | Firebase web app ID |
-| `VITE_OPENROUTER_API_KEY` | OpenRouter API key for calendar extraction |
 
-Note: `VITE_FIREBASE_PROJECT_ID` is set automatically from `FIREBASE_PROJECT_ID` in the workflow. Calendar extraction uses OpenRouter's hardcoded `openrouter/free` router.
+Note: `VITE_FIREBASE_PROJECT_ID` is set automatically from `FIREBASE_PROJECT_ID` in the workflow. Calendar extraction uses Cloud Function `extractCalendar` (Gemini 3.5 Flash-Lite + BAML). The Google API key is **not** a GitHub/Vite secret — it lives in Firebase Secrets Manager as `GOOGLE_API_KEY`.
 
 ## Manual deploy trigger
 
@@ -53,3 +58,4 @@ You can also run the workflow manually from the **Actions** tab via **workflow_d
 
 - **Firebase Hosting** — built Astro app from `web/dist`
 - **Firestore rules** — `firestore.rules` and indexes
+- **Cloud Functions** — `extractCalendar` callable (BAML + Gemini)

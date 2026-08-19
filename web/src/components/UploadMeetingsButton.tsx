@@ -1,6 +1,6 @@
 import { useRef, useState } from 'react';
 import type { CalendarExtractionResult } from '@baby-watcher/shared';
-import { extractCalendarFromImage } from '../lib/openrouter';
+import { extractCalendarFromImage } from '../lib/calendar-extraction';
 import { saveAvailability, saveAvailabilityBatch } from '../lib/firestore-api';
 import { fileToBase64, shiftDate, type UserProfile } from '../lib/utils';
 

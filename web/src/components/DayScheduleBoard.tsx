@@ -592,12 +592,10 @@ export function DayScheduleBoard({
     const end = parseWallClockTime(editEnd)!;
     const title = editTitle.trim();
     const busySlots = getMemberBusySlots(meetingForm.memberUserId, date, householdUploads);
-    const nextSlot: BusySlot = {
-      ...meetingForm.busySlot,
-      start,
-      end,
-      title: title || undefined,
-    };
+    // Omit empty titles — Firestore rejects `undefined` field values.
+    const nextSlot: BusySlot = title
+      ? { start, end, title }
+      : { start, end };
 
     const nextBusySlots =
       meetingForm.mode === 'add'
