@@ -48,7 +48,7 @@ Also create a **`production` environment** in GitHub (Settings → Environments)
 | `VITE_FIREBASE_MESSAGING_SENDER_ID` | Firebase messaging sender ID |
 | `VITE_FIREBASE_APP_ID` | Firebase web app ID |
 
-Note: `VITE_FIREBASE_PROJECT_ID` is set automatically from `FIREBASE_PROJECT_ID` in the workflow. Calendar extraction uses Cloud Function `extractCalendar` (Gemini 2.5 Flash-Lite + BAML). The Google API key is **not** a GitHub/Vite secret — it lives in Firebase Secrets Manager as `GOOGLE_API_KEY`.
+Note: `VITE_FIREBASE_PROJECT_ID` is set automatically from `FIREBASE_PROJECT_ID` in the workflow. Calendar extraction uses Cloud Function `extractCalendar` (Gemini 3.5 Flash + BAML). The Google API key is **not** a GitHub/Vite secret — it lives in Firebase Secrets Manager as `GOOGLE_API_KEY`.
 
 ## Manual deploy trigger
 

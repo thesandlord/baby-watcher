@@ -2,14 +2,14 @@
 
 Coordinate baby-watching coverage during the work day by uploading calendar screenshots and generating a fair, deterministic 8am–5pm schedule in 30-minute watch slots. Meeting times support 15-minute precision.
 
-Firebase Auth + Firestore hold household data. Calendar screenshot OCR runs in a secure Cloud Function using Gemini 2.5 Flash-Lite with BAML structured outputs. Schedule generation stays deterministic in the shared package / browser.
+Firebase Auth + Firestore hold household data. Calendar screenshot OCR runs in a secure Cloud Function using Gemini 3.5 Flash with BAML structured outputs. Schedule generation stays deterministic in the shared package / browser.
 
 ## Features
 
 - Firebase Authentication (email/password and Google)
 - Shared households with invite codes
 - Calendar screenshot upload from mobile
-- Secure Cloud Function OCR (Gemini 2.5 Flash-Lite + BAML)
+- Secure Cloud Function OCR (Gemini 3.5 Flash + BAML)
 - Deterministic schedule generation with load balancing
 - Mobile-first schedule UI with day picker and floating camera button
 
