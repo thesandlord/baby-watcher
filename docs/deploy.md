@@ -69,6 +69,12 @@ gcloud projects add-iam-policy-binding PROJECT_ID \
   --role="roles/firebaseextensions.viewer"
 ```
 
+### Cloud Run logs: "The request was not authenticated"
+
+Gen 2 **callable** functions run on Cloud Run, which does not understand Firebase Auth tokens at the IAM layer. `extractCalendar` sets `invoker: 'public'` so the Firebase client can reach the function; sign-in is enforced in function code via `request.auth`.
+
+After changing invoker settings, redeploy functions so Cloud Run IAM is updated.
+
 ## What gets deployed
 
 - **Firebase Hosting** — built Astro app from `web/dist`

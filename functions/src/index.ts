@@ -167,6 +167,7 @@ function buildHints(options: { hintedDate?: string; weekDates?: string[] }): str
 
 export const extractCalendar = onCall(
   {
+    invoker: 'public',
     secrets: [googleApiKey],
     timeoutSeconds: 120,
     memory: '512MiB',
