@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, type SubmitEvent } from 'react';
 import { createHousehold, joinHousehold } from '../lib/firestore-api';
 import type { HouseholdRole } from '../lib/utils';
 import { ThemeToggle } from './ThemeToggle';
@@ -16,7 +16,7 @@ export function OnboardingScreen({ onComplete, loadError }: OnboardingScreenProp
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
-  async function handleCreate(event: React.FormEvent<HTMLFormElement>) {
+  async function handleCreate(event: SubmitEvent<HTMLFormElement>) {
     event.preventDefault();
     setBusy(true);
     setError(null);
@@ -31,7 +31,7 @@ export function OnboardingScreen({ onComplete, loadError }: OnboardingScreenProp
     }
   }
 
-  async function handleJoin(event: React.FormEvent<HTMLFormElement>, role: HouseholdRole) {
+  async function handleJoin(event: SubmitEvent<HTMLFormElement>, role: HouseholdRole) {
     event.preventDefault();
     setBusy(true);
     setError(null);
