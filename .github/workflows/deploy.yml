@@ -55,5 +55,13 @@ jobs:
         with:
           credentials_json: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
 
+      - name: Set up gcloud
+        uses: google-github-actions/setup-gcloud@v3
+
       - name: Deploy Firebase hosting, Firestore rules, and functions
         run: npx firebase deploy --only hosting,firestore,functions --project "${{ secrets.FIREBASE_PROJECT_ID }}" --non-interactive
+
+      # Cloud Run IAM must allow unauthenticated network invoke for browser
+      # callables; Firebase Auth is still enforced inside extractCalendar.
+      - name: Ensure extractCalendar Cloud Run invoker for browsers
+        run: bash scripts/ensure-extract-calendar-invoker.sh "${{ secrets.FIREBASE_PROJECT_ID }}"
