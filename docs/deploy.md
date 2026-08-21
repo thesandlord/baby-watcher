@@ -69,23 +69,25 @@ gcloud projects add-iam-policy-binding PROJECT_ID \
   --role="roles/firebaseextensions.viewer"
 ```
 
-### Cloud Run logs: "The request was not authenticated" / browser CORS on `extractCalendar`
+### Browser CORS / Cloud Run "Require authentication" on `extractCalendar`
 
-Gen 2 **callable** functions run on Cloud Run, which does not understand Firebase Auth tokens at the IAM layer. Unauthenticated OPTIONS (CORS preflight) must reach the service, or the browser reports a CORS failure and the UI may show `internal`.
+Gen 2 callables run on Cloud Run. **Firebase Auth ID tokens are not Cloud Run IAM credentials.**
 
-`extractCalendar` sets `invoker: 'public'` in code, and the deploy workflow also runs [`scripts/ensure-extract-calendar-public.sh`](../scripts/ensure-extract-calendar-public.sh) after `firebase deploy` to:
+If Cloud Run Security is set to **Require authentication**, anonymous browser OPTIONS (CORS preflight) get **403**, which the UI surfaces as CORS / `internal`. That setting only understands GCP identities — not “signed-in baby-watcher users.”
 
-1. Grant Cloud Run Invoker to `allUsers`, or
-2. If Domain Restricted Sharing blocks that, disable the Cloud Run invoker IAM check (`--no-invoker-iam-check`)
+The supported pattern for browser callables:
 
-Sign-in is still enforced in function code via `request.auth`.
+1. Cloud Run **Allow public access** (`invoker: 'public'` / `allUsers` with Cloud Run Invoker) so the request can reach the function.
+2. Function code still requires a signed-in user via `request.auth` (unsigned callers get `unauthenticated`).
 
-The CI service account needs permission to set Cloud Run IAM (included in **Cloud Run Admin** / `roles/run.admin`, or at least `run.services.setIamPolicy`).
+Deploy also runs [`scripts/ensure-extract-calendar-invoker.sh`](../scripts/ensure-extract-calendar-invoker.sh) after `firebase deploy`, because Gen2 updates do not always apply the IAM binding. If Domain Restricted Sharing blocks `allUsers`, the script falls back to `--no-invoker-iam-check`.
 
-Manual repair (replace `PROJECT_ID`):
+**Manual fix in console:** Cloud Run → `extractcalendar` → Security → **Allow public access** → Save. Keep the `request.auth` check in code (already present).
+
+CI needs permission to set Cloud Run IAM (**Cloud Run Admin** / `roles/run.admin`, or `run.services.setIamPolicy`).
 
 ```bash
-bash scripts/ensure-extract-calendar-public.sh PROJECT_ID
+bash scripts/ensure-extract-calendar-invoker.sh PROJECT_ID
 ```
 
 ## What gets deployed

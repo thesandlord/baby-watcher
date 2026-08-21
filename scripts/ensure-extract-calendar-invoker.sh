@@ -1,17 +1,17 @@
 #!/usr/bin/env bash
-# Ensure Gen2 extractCalendar is reachable by Firebase web clients.
-# Cloud Run IAM rejects unauthenticated OPTIONS/preflight with 403, which browsers
-# surface as a CORS error. Firebase Auth is still enforced inside the function.
+# Gen2 callables sit behind Cloud Run IAM. Firebase Auth ID tokens are NOT Cloud
+# Run credentials, so the service must allow unauthenticated *network* invoke
+# (allUsers / Allow public access). App users are still gated in function code
+# via request.auth — unsigned callers get HttpsError('unauthenticated').
 set -euo pipefail
 
 PROJECT_ID="${1:?project id required}"
 REGION="${2:-us-central1}"
 FUNCTION_NAME="${3:-extractCalendar}"
-# Gen2 Cloud Run service names are lowercase.
 SERVICE_NAME="$(echo "$FUNCTION_NAME" | tr '[:upper:]' '[:lower:]')"
 URL="https://${REGION}-${PROJECT_ID}.cloudfunctions.net/${FUNCTION_NAME}"
 
-echo "Ensuring public invoke access for ${FUNCTION_NAME} in ${PROJECT_ID}/${REGION}..."
+echo "Allowing Cloud Run network invoke for ${FUNCTION_NAME} (Firebase Auth still required in code)..."
 
 grant_all_users() {
   if gcloud functions add-invoker-policy-binding "$FUNCTION_NAME" \
@@ -22,7 +22,6 @@ grant_all_users() {
     return 0
   fi
 
-  # Fallback for older CLI / naming: bind directly on the Cloud Run service.
   gcloud run services add-iam-policy-binding "$SERVICE_NAME" \
     --region="$REGION" \
     --member="allUsers" \
@@ -32,7 +31,7 @@ grant_all_users() {
 }
 
 disable_invoker_iam_check() {
-  # Recommended when Domain Restricted Sharing blocks allUsers.
+  # Use when Domain Restricted Sharing blocks the allUsers principal.
   gcloud run services update "$SERVICE_NAME" \
     --region="$REGION" \
     --project="$PROJECT_ID" \
@@ -59,6 +58,7 @@ rm -f "$TMP_BODY"
 if [[ "$STATUS" == "403" ]] && grep -q 'does not have permission' <<<"$BODY"; then
   echo "Cloud Run still blocks unauthenticated invoke (HTTP ${STATUS})."
   echo "$BODY"
+  echo "In Cloud Run → Security, choose Allow public access (Firebase Auth remains enforced in code)."
   exit 1
 fi
 

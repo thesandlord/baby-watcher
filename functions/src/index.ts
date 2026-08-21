@@ -167,10 +167,11 @@ function buildHints(options: { hintedDate?: string; weekDates?: string[] }): str
 
 export const extractCalendar = onCall(
   {
-    // Public at the Cloud Run IAM layer so browsers can complete CORS preflight;
-    // Firebase Auth is still required below via request.auth.
-    // Deploy also runs scripts/ensure-extract-calendar-public.sh because Gen2
-    // updates do not always apply invoker IAM.
+    // Cloud Run must allow unauthenticated *network* invoke so browsers can
+    // complete CORS preflight. That is NOT the same as allowing anonymous app
+    // users: request.auth below still requires a signed-in Firebase user.
+    // Deploy also runs scripts/ensure-extract-calendar-invoker.sh because Gen2
+    // updates do not always apply this IAM binding.
     invoker: 'public',
     secrets: [googleApiKey],
     timeoutSeconds: 120,
