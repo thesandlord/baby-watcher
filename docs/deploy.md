@@ -69,11 +69,24 @@ gcloud projects add-iam-policy-binding PROJECT_ID \
   --role="roles/firebaseextensions.viewer"
 ```
 
-### Cloud Run logs: "The request was not authenticated"
+### Cloud Run logs: "The request was not authenticated" / browser CORS on `extractCalendar`
 
-Gen 2 **callable** functions run on Cloud Run, which does not understand Firebase Auth tokens at the IAM layer. `extractCalendar` sets `invoker: 'public'` so the Firebase client can reach the function; sign-in is enforced in function code via `request.auth`.
+Gen 2 **callable** functions run on Cloud Run, which does not understand Firebase Auth tokens at the IAM layer. Unauthenticated OPTIONS (CORS preflight) must reach the service, or the browser reports a CORS failure and the UI may show `internal`.
 
-After changing invoker settings, redeploy functions so Cloud Run IAM is updated.
+`extractCalendar` sets `invoker: 'public'` in code, and the deploy workflow also runs [`scripts/ensure-extract-calendar-public.sh`](../scripts/ensure-extract-calendar-public.sh) after `firebase deploy` to:
+
+1. Grant Cloud Run Invoker to `allUsers`, or
+2. If Domain Restricted Sharing blocks that, disable the Cloud Run invoker IAM check (`--no-invoker-iam-check`)
+
+Sign-in is still enforced in function code via `request.auth`.
+
+The CI service account needs permission to set Cloud Run IAM (included in **Cloud Run Admin** / `roles/run.admin`, or at least `run.services.setIamPolicy`).
+
+Manual repair (replace `PROJECT_ID`):
+
+```bash
+bash scripts/ensure-extract-calendar-public.sh PROJECT_ID
+```
 
 ## What gets deployed
 

@@ -55,5 +55,13 @@ jobs:
         with:
           credentials_json: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
 
+      - name: Set up gcloud
+        uses: google-github-actions/setup-gcloud@v3
+
       - name: Deploy Firebase hosting, Firestore rules, and functions
         run: npx firebase deploy --only hosting,firestore,functions --project "${{ secrets.FIREBASE_PROJECT_ID }}" --non-interactive
+
+      # firebase `invoker: 'public'` does not always apply on Gen2 updates; browsers then
+      # see OPTIONS 403 as a CORS error. Explicitly grant invoke + verify preflight.
+      - name: Ensure extractCalendar allows public invoke
+        run: bash scripts/ensure-extract-calendar-public.sh "${{ secrets.FIREBASE_PROJECT_ID }}"
