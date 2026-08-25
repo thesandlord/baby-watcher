@@ -22,6 +22,7 @@ jobs:
       VITE_FIREBASE_STORAGE_BUCKET: ${{ secrets.VITE_FIREBASE_STORAGE_BUCKET }}
       VITE_FIREBASE_MESSAGING_SENDER_ID: ${{ secrets.VITE_FIREBASE_MESSAGING_SENDER_ID }}
       VITE_FIREBASE_APP_ID: ${{ secrets.VITE_FIREBASE_APP_ID }}
+      VITE_OPENROUTER_API_KEY: ${{ secrets.VITE_OPENROUTER_API_KEY }}
       VITE_USE_FIREBASE_EMULATORS: 'false'
       VITE_MOCK_CALENDAR_EXTRACTION: 'false'
 
@@ -38,30 +39,16 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Install Cloud Functions dependencies
-        run: npm ci --prefix functions
-
       - name: Run tests
         run: npm test
 
       - name: Build
         run: npm run build
 
-      - name: Verify Cloud Functions startup
-        run: npm test --prefix functions
-
       - name: Authenticate to Google Cloud
         uses: google-github-actions/auth@v3
         with:
           credentials_json: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
 
-      - name: Set up gcloud
-        uses: google-github-actions/setup-gcloud@v3
-
-      - name: Deploy Firebase hosting, Firestore rules, and functions
-        run: npx firebase deploy --only hosting,firestore,functions --project "${{ secrets.FIREBASE_PROJECT_ID }}" --non-interactive
-
-      # Cloud Run IAM must allow unauthenticated network invoke for browser
-      # callables; Firebase Auth is still enforced inside extractCalendar.
-      - name: Ensure extractCalendar Cloud Run invoker for browsers
-        run: bash scripts/ensure-extract-calendar-invoker.sh "${{ secrets.FIREBASE_PROJECT_ID }}"
+      - name: Deploy Firebase hosting and Firestore rules
+        run: npx firebase deploy --only hosting,firestore --project "${{ secrets.FIREBASE_PROJECT_ID }}" --non-interactive
