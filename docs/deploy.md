@@ -9,7 +9,7 @@ Workflow: [`.github/workflows/deploy.yml`](../.github/workflows/deploy.yml)
 ## One-time Firebase setup
 
 1. Create a Firebase project for production.
-2. Enable **Authentication** (Email/Password + Google), **Firestore**, and **Functions**.
+2. Enable **Authentication** (Email/Password + Google) and **Firestore**.
 3. Register a **Web app** in Firebase console and copy the config values.
 4. Create a **service account** for CI:
    - Google Cloud Console → IAM → Service Accounts
@@ -18,13 +18,6 @@ Workflow: [`.github/workflows/deploy.yml`](../.github/workflows/deploy.yml)
      - `Firebase Hosting Admin`
      - `Firebase Rules Admin`
      - `Cloud Datastore User` (for Firestore rules/indexes deploy)
-     - `Cloud Functions Admin` / `Service Account User` (for functions deploy)
-     - `Firebase Extensions Viewer` (required by Firebase CLI to list extension instances during functions deploy, even when the project uses no extensions)
-5. Set the Google AI API key used by calendar OCR:
-
-```bash
-firebase functions:secrets:set GOOGLE_API_KEY --project YOUR_PROJECT_ID
-```
 
 ## GitHub secrets to configure
 
@@ -48,50 +41,15 @@ Also create a **`production` environment** in GitHub (Settings → Environments)
 | `VITE_FIREBASE_STORAGE_BUCKET` | `{projectId}.appspot.com` or `{projectId}.firebasestorage.app` |
 | `VITE_FIREBASE_MESSAGING_SENDER_ID` | Firebase messaging sender ID |
 | `VITE_FIREBASE_APP_ID` | Firebase web app ID |
+| `VITE_OPENROUTER_API_KEY` | OpenRouter API key for calendar extraction |
 
-Note: `VITE_FIREBASE_PROJECT_ID` is set automatically from `FIREBASE_PROJECT_ID` in the workflow. Calendar extraction uses Cloud Function `extractCalendar` (Gemini 3.5 Flash-Lite + BAML). The Google API key is **not** a GitHub/Vite secret — it lives in Firebase Secrets Manager as `GOOGLE_API_KEY`.
+Note: `VITE_FIREBASE_PROJECT_ID` is set automatically from `FIREBASE_PROJECT_ID` in the workflow. Calendar extraction uses OpenRouter's hardcoded `openrouter/free` router.
 
 ## Manual deploy trigger
 
 You can also run the workflow manually from the **Actions** tab via **workflow_dispatch**.
 
-## Troubleshooting deploy failures
-
-### `firebaseextensions.googleapis.com` returns 403
-
-Firebase CLI lists extension instances whenever functions are deployed, even if this project defines no extensions. Grant the CI service account **`Firebase Extensions Viewer`** (`roles/firebaseextensions.viewer`) on the Firebase/GCP project, then re-run deploy.
-
-Example (replace `PROJECT_ID` and `SERVICE_ACCOUNT_EMAIL`):
-
-```bash
-gcloud projects add-iam-policy-binding PROJECT_ID \
-  --member="serviceAccount:SERVICE_ACCOUNT_EMAIL" \
-  --role="roles/firebaseextensions.viewer"
-```
-
-### Browser CORS / Cloud Run "Require authentication" on `extractCalendar`
-
-Gen 2 callables run on Cloud Run. **Firebase Auth ID tokens are not Cloud Run IAM credentials.**
-
-If Cloud Run Security is set to **Require authentication**, anonymous browser OPTIONS (CORS preflight) get **403**, which the UI surfaces as CORS / `internal`. That setting only understands GCP identities — not “signed-in baby-watcher users.”
-
-The supported pattern for browser callables:
-
-1. Cloud Run **Allow public access** (`invoker: 'public'` / `allUsers` with Cloud Run Invoker) so the request can reach the function.
-2. Function code still requires a signed-in user via `request.auth` (unsigned callers get `unauthenticated`).
-
-Deploy also runs [`scripts/ensure-extract-calendar-invoker.sh`](../scripts/ensure-extract-calendar-invoker.sh) after `firebase deploy`, because Gen2 updates do not always apply the IAM binding. If Domain Restricted Sharing blocks `allUsers`, the script falls back to `--no-invoker-iam-check`.
-
-**Manual fix in console:** Cloud Run → `extractcalendar` → Security → **Allow public access** → Save. Keep the `request.auth` check in code (already present).
-
-CI needs permission to set Cloud Run IAM (**Cloud Run Admin** / `roles/run.admin`, or `run.services.setIamPolicy`).
-
-```bash
-bash scripts/ensure-extract-calendar-invoker.sh PROJECT_ID
-```
-
 ## What gets deployed
 
 - **Firebase Hosting** — built Astro app from `web/dist`
 - **Firestore rules** — `firestore.rules` and indexes
-- **Cloud Functions** — `extractCalendar` callable (BAML + Gemini), Node.js **24** runtime (`nodejs24`)
