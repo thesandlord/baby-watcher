@@ -102,7 +102,7 @@ export function viewDatesFor(activeDate: string, mode: ScheduleViewMode): string
   return [activeDate, second, third];
 }
 
-export function formatViewHeading(dates: string[]): string {
+export function formatViewHeading(_dates: string[]): string {
   return ''
 }
 
